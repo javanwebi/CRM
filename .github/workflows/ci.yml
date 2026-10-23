@@ -35,6 +35,9 @@ jobs:
           PGPASSWORD=ci-only-password psql -h localhost -U crm -d crm -f docker/init.sql
           pnpm db:migrate
           pnpm db:migrate
+      - run: node --import tsx tests/native-smoke.ts
+        env:
+          DATABASE_ENV: test
       - run: pnpm exec playwright install --with-deps chromium
       - run: pnpm test:e2e
         env:

@@ -86,7 +86,7 @@ export function createApp(
         }
         const session = token();
         await db.query(
-          "INSERT INTO private.sessions(id,user_id,expires_at) VALUES($1,$2,now()+interval '7 days') RETURNING id",
+          "INSERT INTO private.sessions(id,user_id,expires_at) VALUES($1,$2::uuid,now()+interval '7 days') RETURNING id",
           [digest(session), user!.id],
         );
         res
@@ -161,7 +161,7 @@ export function createApp(
           [name],
         );
         const [role] = await tx.query<{ id: string }>(
-          "INSERT INTO public.roles(tenant_id,name,grants) VALUES($1,$2,$3::text[]) RETURNING id",
+          "INSERT INTO public.roles(tenant_id,name,grants) VALUES($1::uuid,$2,$3::text[]) RETURNING id",
           [
             t.id,
             "Owner",
@@ -175,15 +175,15 @@ export function createApp(
           ],
         );
         await tx.query(
-          "INSERT INTO public.memberships(tenant_id,user_id,role_id) VALUES($1,$2,$3) RETURNING id",
+          "INSERT INTO public.memberships(tenant_id,user_id,role_id) VALUES($1::uuid,$2::uuid,$3::uuid) RETURNING id",
           [t.id, res.locals.user.id, role.id],
         );
         await tx.query(
-          "INSERT INTO public.tenant_settings(tenant_id) VALUES($1) RETURNING id",
+          "INSERT INTO public.tenant_settings(tenant_id) VALUES($1::uuid) RETURNING id",
           [t.id],
         );
         const [pipeline] = await tx.query<{ id: string }>(
-          "INSERT INTO public.pipelines(tenant_id,name) VALUES($1,$2) RETURNING id",
+          "INSERT INTO public.pipelines(tenant_id,name) VALUES($1::uuid,$2) RETURNING id",
           [t.id, "Sales"],
         );
         for (const [position, name] of [
@@ -194,7 +194,7 @@ export function createApp(
           "Closed",
         ].entries())
           await tx.query(
-            "INSERT INTO public.pipeline_stages(tenant_id,pipeline_id,name,position,probability) VALUES($1,$2,$3,$4,$5) RETURNING id",
+            "INSERT INTO public.pipeline_stages(tenant_id,pipeline_id,name,position,probability) VALUES($1::uuid,$2::uuid,$3,$4,$5) RETURNING id",
             [t.id, pipeline.id, name, position, position * 25],
           );
         await audit(tx, t.id, res.locals.user.id, "create", "tenants", t.id);
@@ -225,18 +225,18 @@ export function createApp(
       res.json(
         await authorized(req, res, "crm.read", async (tx, t) => {
           const [summary] = await tx.query(
-            `SELECT (SELECT count(*) FROM accounts WHERE tenant_id=$1)::int AS accounts,(SELECT count(*) FROM contacts WHERE tenant_id=$1)::int AS contacts,(SELECT count(*) FROM leads WHERE tenant_id=$1)::int AS leads,(SELECT count(*) FROM tasks WHERE tenant_id=$1 AND status<>'done')::int AS tasks`,
+            `SELECT (SELECT count(*) FROM accounts WHERE tenant_id=$1::uuid)::int AS accounts,(SELECT count(*) FROM contacts WHERE tenant_id=$1::uuid)::int AS contacts,(SELECT count(*) FROM leads WHERE tenant_id=$1::uuid)::int AS leads,(SELECT count(*) FROM tasks WHERE tenant_id=$1::uuid AND status<>'done')::int AS tasks`,
             [t],
           );
           const totals = await tx.query(
-            "SELECT currency,sum(value)::text AS value FROM deals WHERE tenant_id=$1 AND status=$2 GROUP BY currency",
+            "SELECT currency,sum(value)::text AS value FROM deals WHERE tenant_id=$1::uuid AND status=$2 GROUP BY currency",
             [t, "open"],
           );
           return {
             ...summary,
             totals,
             recent: await tx.query(
-              "SELECT action,resource,created_at FROM audit_logs WHERE tenant_id=$1 ORDER BY created_at DESC LIMIT 10",
+              "SELECT action,resource,created_at FROM audit_logs WHERE tenant_id=$1::uuid ORDER BY created_at DESC LIMIT 10",
               [t],
             ),
           };
@@ -253,7 +253,7 @@ export function createApp(
         res.json(
           await authorized(req, res, "crm.read", async (tx, t) => {
             const p = paging.parse(req.query);
-            let where = `tenant_id=$1 AND name ILIKE $2`;
+            let where = `tenant_id=$1::uuid AND name ILIKE $2`;
             const values = [t, `%${p.search}%`];
             if (p.status) {
               if (!("status" in schema.shape))
@@ -285,7 +285,7 @@ export function createApp(
         res.json(
           await authorized(req, res, "crm.read", async (tx, t) => {
             const [row] = await tx.query(
-              `SELECT * FROM ${table} WHERE tenant_id=$1 AND id=$2`,
+              `SELECT * FROM ${table} WHERE tenant_id=$1::uuid AND id=$2::uuid`,
               [t, uuid.parse(req.params.id)],
             );
             if (!row) throw new HttpError(404, "Record not found");
@@ -302,7 +302,7 @@ export function createApp(
             const body = schema.parse(req.body);
             const keys = Object.keys(body);
             const [row] = await tx.query<{ id: string }>(
-              `INSERT INTO ${table}(tenant_id,${keys.join(",")}) VALUES($1,${keys.map((_, i) => "$" + (i + 2)).join(",")}) RETURNING *`,
+              `INSERT INTO ${table}(tenant_id,${keys.join(",")}) VALUES($1::uuid,${keys.map((k, i) => "$" + (i + 2) + sqlCast(k)).join(",")}) RETURNING *`,
               [t, ...Object.values(body)],
             );
             await audit(tx, t, res.locals.user.id, "create", table, row.id);
@@ -321,7 +321,7 @@ export function createApp(
             const keys = Object.keys(body);
             if (!keys.length) throw new HttpError(400, "No fields");
             const [row] = await tx.query(
-              `UPDATE ${table} SET ${keys.map((k, i) => `${k}=$${i + 3}`).join(",")},updated_at=now() WHERE tenant_id=$1 AND id=$2 RETURNING *`,
+              `UPDATE ${table} SET ${keys.map((k, i) => `${k}=$${i + 3}${sqlCast(k)}`).join(",")},updated_at=now() WHERE tenant_id=$1::uuid AND id=$2::uuid RETURNING *`,
               [t, id, ...Object.values(body)],
             );
             if (!row) throw new HttpError(404, "Record not found");
@@ -339,11 +339,11 @@ export function createApp(
       const t = uuid.parse(req.params.tenant);
       await authorized(req, res, "team.manage", async () => true);
       const members = await db.query(
-        "SELECT m.id,m.user_id,m.role_id,u.name,u.email,r.name AS role FROM memberships m JOIN users u ON u.id=m.user_id JOIN roles r ON r.id=m.role_id WHERE m.tenant_id=$1",
+        "SELECT m.id,m.user_id,m.role_id,u.name,u.email,r.name AS role FROM memberships m JOIN users u ON u.id=m.user_id JOIN roles r ON r.id=m.role_id WHERE m.tenant_id=$1::uuid",
         [t],
       );
       const roles = await db.query(
-        "SELECT id,name,grants FROM roles WHERE tenant_id=$1",
+        "SELECT id,name,grants FROM roles WHERE tenant_id=$1::uuid",
         [t],
       );
       res.json({ members, roles });
@@ -373,7 +373,7 @@ export function createApp(
       await authorized(req, res, "team.manage", async () => true);
       const result = await db.transaction(async (tx) => {
         const [row] = await tx.query<{ id: string }>(
-          "INSERT INTO roles(tenant_id,name,grants) VALUES($1,$2,$3::text[]) RETURNING *",
+          "INSERT INTO roles(tenant_id,name,grants) VALUES($1::uuid,$2,$3::text[]) RETURNING *",
           [t, body.name, body.grants],
         );
         await audit(tx, t, res.locals.user.id, "create", "roles", row.id);
@@ -391,16 +391,18 @@ export function createApp(
       await authorized(req, res, "team.manage", async () => true);
       const row = await db.transaction(async (tx) => {
         // Serialize membership changes per tenant to preserve the final manager.
-        await tx.query("SELECT id FROM tenants WHERE id=$1 FOR UPDATE", [t]);
+        await tx.query("SELECT id FROM tenants WHERE id=$1::uuid FOR UPDATE", [
+          t,
+        ]);
         const [member] = await tx.query<{ user_id: string }>(
-          "SELECT user_id FROM memberships WHERE tenant_id=$1 AND id=$2",
+          "SELECT user_id FROM memberships WHERE tenant_id=$1::uuid AND id=$2::uuid",
           [t, id],
         );
         if (!member) throw new HttpError(404, "Membership not found");
         if (member.user_id === res.locals.user.id)
           throw new HttpError(400, "A manager cannot change their own role");
         const [updated] = await tx.query(
-          "UPDATE memberships SET role_id=$3 WHERE tenant_id=$1 AND id=$2 RETURNING *",
+          "UPDATE memberships SET role_id=$3::uuid WHERE tenant_id=$1::uuid AND id=$2::uuid RETURNING *",
           [t, id, role_id],
         );
         await audit(tx, t, res.locals.user.id, "update", "memberships", id);
@@ -420,7 +422,7 @@ export function createApp(
       await authorized(req, res, "settings.manage", async () => true);
       const row = await db.transaction(async (tx) => {
         const [updated] = await tx.query(
-          "UPDATE tenants SET name=$2 WHERE id=$1 RETURNING *",
+          "UPDATE tenants SET name=$2 WHERE id=$1::uuid RETURNING *",
           [t, name],
         );
         await audit(tx, t, res.locals.user.id, "update", "tenants", t);
@@ -447,7 +449,7 @@ export function createApp(
       const code = token();
       await db.transaction(async (tx) => {
         await tx.query(
-          "INSERT INTO private.invitations(tenant_id,email,role_id,token_hash,expires_at) VALUES($1,$2,$3,$4,now()+interval '48 hours') RETURNING id",
+          "INSERT INTO private.invitations(tenant_id,email,role_id,token_hash,expires_at) VALUES($1::uuid,$2,$3::uuid,$4,now()+interval '48 hours') RETURNING id",
           [t, body.email, body.role_id, digest(code)],
         );
         await audit(tx, t, res.locals.user.id, "invite", "memberships", null);
@@ -475,11 +477,11 @@ export function createApp(
         if (!invite || invite.email !== res.locals.user.email)
           throw new HttpError(403, "Invalid invitation");
         await tx.query(
-          "INSERT INTO memberships(tenant_id,user_id,role_id) VALUES($1,$2,$3) RETURNING id",
+          "INSERT INTO memberships(tenant_id,user_id,role_id) VALUES($1::uuid,$2::uuid,$3::uuid) RETURNING id",
           [invite.tenant_id, res.locals.user.id, invite.role_id],
         );
         await tx.query(
-          "UPDATE private.invitations SET accepted_at=now() WHERE id=$1 RETURNING id",
+          "UPDATE private.invitations SET accepted_at=now() WHERE id=$1::uuid RETURNING id",
           [invite.id],
         );
         await audit(
@@ -505,7 +507,7 @@ export function createApp(
           async (tx, t) =>
             (
               await tx.query(
-                "SELECT * FROM tenant_settings WHERE tenant_id=$1",
+                "SELECT * FROM tenant_settings WHERE tenant_id=$1::uuid",
                 [t],
               )
             )[0],
@@ -527,7 +529,7 @@ export function createApp(
       res.json(
         await authorized(req, res, "settings.manage", async (tx, t) => {
           const [s] = await tx.query(
-            "UPDATE tenant_settings SET locale=$2,currency=$3,timezone=$4 WHERE tenant_id=$1 RETURNING *",
+            "UPDATE tenant_settings SET locale=$2,currency=$3,timezone=$4 WHERE tenant_id=$1::uuid RETURNING *",
             [t, b.locale, b.currency, b.timezone],
           );
           await audit(
@@ -549,7 +551,7 @@ export function createApp(
       res.json(
         await authorized(req, res, "team.manage", (tx, t) =>
           tx.query(
-            "SELECT * FROM audit_logs WHERE tenant_id=$1 ORDER BY created_at DESC LIMIT 100",
+            "SELECT * FROM audit_logs WHERE tenant_id=$1::uuid ORDER BY created_at DESC LIMIT 100",
             [t],
           ),
         ),
@@ -578,9 +580,17 @@ export function createApp(
           .json({ error: "Invalid input", issues: error.issues });
       if (error instanceof HttpError)
         return res.status(error.status).json({ error: error.message });
-      if (error.code === "23505" || error.message.includes("23505"))
+      if (
+        (error as any).meta?.code === "23505" ||
+        error.code === "23505" ||
+        error.message.includes("23505")
+      )
         return res.status(409).json({ error: "Record already exists" });
-      if (error.code === "23503" || error.message.includes("23503"))
+      if (
+        (error as any).meta?.code === "23503" ||
+        error.code === "23503" ||
+        error.message.includes("23503")
+      )
         return res.status(400).json({ error: "Invalid related record" });
       console.error(
         "request_failed",
@@ -601,7 +611,15 @@ async function audit(
   id: string | null,
 ) {
   await tx.query(
-    "INSERT INTO audit_logs(tenant_id,actor_id,action,resource,record_id) VALUES($1,$2,$3,$4,$5) RETURNING id",
+    "INSERT INTO audit_logs(tenant_id,actor_id,action,resource,record_id) VALUES($1::uuid,$2::uuid,$3,$4,$5::uuid) RETURNING id",
     [t, u, action, resource, id],
   );
+}
+
+function sqlCast(key: string) {
+  return key.endsWith("_id")
+    ? "::uuid"
+    : key === "due_at"
+      ? "::timestamptz"
+      : "";
 }

@@ -229,6 +229,7 @@ model AiRuns {
   requested_by String @db.Uuid
   @@map("ai_runs")
   @@schema("public")
+  @@unique([tenant_id,id])
 }
 
 model ToolRegistry {
@@ -240,6 +241,7 @@ model ToolRegistry {
   sensitive Boolean @default(true)
   @@map("tool_registry")
   @@schema("public")
+  @@unique([tenant_id,id])
 }
 
 model ToolPermissions {

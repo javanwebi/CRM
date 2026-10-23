@@ -30,6 +30,12 @@ beforeAll(async () => {
       "utf8",
     ),
   );
+  await pg.exec(
+    readFileSync(
+      new URL("../packages/database/writer-audit.sql", import.meta.url),
+      "utf8",
+    ),
+  );
   const executor: Executor = {
     query: async <T>(sql: string, values: unknown[] = []) => {
       const result = await pg.query<T>(sql, values);
@@ -250,6 +256,113 @@ describe.sequential(
       await expect(
         scoped(db, ua, (tx) => tx.query("DELETE FROM audit_logs RETURNING id")),
       ).rejects.toThrow();
+    });
+    it("manages another member role without allowing self-demotion or viewer escalation", async () => {
+      const team = await a.get(`/api/t/${ta}/team`);
+      const self = team.body.members.find((m: any) => m.user_id === ua),
+        other = team.body.members.find((m: any) => m.user_id === ub);
+      const owner = team.body.roles.find((r: any) => r.name === "Owner"),
+        viewer = team.body.roles.find((r: any) => r.name === "Viewer");
+      expect(
+        (
+          await a
+            .patch(`/api/t/${ta}/memberships/${self.id}`)
+            .send({ role_id: viewer.id })
+        ).status,
+      ).toBe(400);
+      expect(
+        (
+          await b
+            .patch(`/api/t/${ta}/memberships/${other.id}`)
+            .send({ role_id: owner.id })
+        ).status,
+      ).toBe(403);
+      expect(
+        (
+          await a
+            .patch(`/api/t/${ta}/memberships/${other.id}`)
+            .send({ role_id: owner.id })
+        ).status,
+      ).toBe(200);
+      expect((await b.get(`/api/t/${ta}/team`)).status).toBe(200);
+      expect(
+        (
+          await a
+            .patch(`/api/t/${ta}/memberships/${other.id}`)
+            .send({ role_id: viewer.id })
+        ).status,
+      ).toBe(200);
+    });
+    it("filters tasks in the database before pagination", async () => {
+      await a
+        .post(`/api/t/${ta}/tasks`)
+        .send({ name: "Open task", status: "todo" });
+      await a
+        .post(`/api/t/${ta}/tasks`)
+        .send({ name: "Finished task", status: "done" });
+      const list = await a.get(`/api/t/${ta}/tasks?status=done&limit=1`);
+      expect(list.status).toBe(200);
+      expect(list.body.total).toBe(1);
+      expect(list.body.data[0].name).toBe("Finished task");
+    });
+    it("enforces composite tenant relationships in AI infrastructure tables", async () => {
+      const [tool] = await db.query<{ id: string }>(
+        "INSERT INTO tool_registry(tenant_id,name,permission) VALUES($1,$2,$3) RETURNING id",
+        [ta, "review", "ai.run"],
+      );
+      const [role] = await db.query<{ id: string }>(
+        "SELECT id FROM roles WHERE tenant_id=$1 LIMIT 1",
+        [tb],
+      );
+      await expect(
+        db.query(
+          "INSERT INTO tool_permissions(tenant_id,tool_id,role_id) VALUES($1,$2,$3) RETURNING id",
+          [tb, tool.id, role.id],
+        ),
+      ).rejects.toThrow();
+      await expect(
+        db.query(
+          "INSERT INTO ai_runs(tenant_id,requested_by) VALUES($1,$2) RETURNING id",
+          [tb, ua],
+        ),
+      ).rejects.toThrow();
+    });
+    it("lets a non-manager writer create records and transactional audit entries", async () => {
+      const editor = await a
+        .post(`/api/t/${ta}/roles`)
+        .send({ name: "Editor", grants: ["crm.read", "crm.write"] });
+      expect(editor.status).toBe(201);
+      const c = request.agent(app);
+      const signup = await c
+        .post("/api/auth/register")
+        .send({
+          name: "Carla",
+          email: "carla@example.test",
+          password: "WriterPassword123!",
+        });
+      expect(signup.status).toBe(201);
+      const invitation = await a
+        .post(`/api/t/${ta}/invitations`)
+        .send({ email: "carla@example.test", role_id: editor.body.id });
+      expect(
+        (
+          await c
+            .post("/api/invitations/accept")
+            .send({ code: invitation.body.invitation_token })
+        ).status,
+      ).toBe(200);
+      expect(
+        (await c.post(`/api/t/${ta}/tasks`).send({ name: "Editor task" }))
+          .status,
+      ).toBe(201);
+      expect((await c.get(`/api/t/${ta}/team`)).status).toBe(403);
+      const logs = await scoped(db, signup.body.user.id, (tx) =>
+        tx.query("SELECT * FROM audit_logs"),
+      );
+      expect(logs.every((r: any) => r.actor_id === signup.body.user.id)).toBe(
+        true,
+      );
+      expect(logs.length).toBeGreaterThan(0);
     });
     it("returns real dashboard metrics and revokes logout sessions", async () => {
       const r = await a.get(`/api/t/${ta}/dashboard`);

@@ -6,6 +6,7 @@ export interface Executor {
   ): Promise<T[]>;
 }
 export interface Database extends Executor {
+  disconnect?(): Promise<void>;
   transaction<T>(fn: (tx: Executor) => Promise<T>): Promise<T>;
 }
 export function database(): Database {
@@ -16,6 +17,7 @@ export function database(): Database {
   });
   return {
     ...wrap(prisma),
+    disconnect: () => prisma.$disconnect(),
     transaction: (fn) =>
       prisma.$transaction((tx) => fn(wrap(tx)), { timeout: 15000 }),
   };

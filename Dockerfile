@@ -9,4 +9,4 @@ RUN pnpm build
 ENV NODE_ENV=production
 USER node
 EXPOSE 3000
-CMD ["pnpm","--filter","@crm/api","start"]
+CMD ["node","--import","tsx","apps/api/src/server.ts"]

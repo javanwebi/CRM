@@ -24,7 +24,7 @@ services:
     build: .
     environment:
       DATABASE_URL: postgresql://crm:${POSTGRES_PASSWORD}@postgres:5432/crm
-    command: [pnpm, db:migrate]
+    command: [node, --import, tsx, packages/database/migrate.ts]
     depends_on:
       postgres: { condition: service_healthy }
   app:
@@ -50,7 +50,7 @@ services:
       retries: 5
   worker:
     build: .
-    command: [pnpm, --filter, "@crm/worker", start]
+    command: [node, --import, tsx, apps/worker/src/index.ts]
     environment:
       REDIS_URL: redis://redis:6379
     depends_on:
