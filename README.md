@@ -39,7 +39,7 @@ pnpm db:migrate
 pnpm dev
 ```
 
-Vite runs on port 5173 and proxies `/api` to Express on 3000. For this mode set APP_ORIGIN=http://localhost:5173. `pnpm build` produces the frontend bundle. Express serves it from `apps/web/dist` in deployed installations. A server-only DATABASE_URL with migration-owner privileges is currently required for authentication, organization bootstrap and team administration; customer/business operations always switch transaction-locally to the non-BYPASSRLS `crm_runtime` role. See the security boundaries below.
+Vite runs on port 5173 and proxies `/api` to Express on 3000. For this mode set APP_ORIGIN=http://localhost:5173. `pnpm build` produces the frontend bundle. Express serves it from `apps/web/dist` in deployed installations. A server-only DATABASE_URL using the dedicated crm_server login is recommended for authentication, organization bootstrap and team administration; customer/business operations always switch transaction-locally to the non-BYPASSRLS `crm_runtime` role. The separate MIGRATION_DATABASE_URL belongs only to the migration runner. See the security boundaries below.
 
 For Supabase use the session pooler connection string from **Connect** with SSL, e.g. `?sslmode=require&connection_limit=5`. Never put the database URL in VITE_* or the frontend. The initial migration and runtime-role grant are in `supabase/migrations`. The Supabase Data API is intentionally denied to anon/authenticated for these custom-auth tables. Supabase is used as PostgreSQL hosting, not as a second competing login system.
 

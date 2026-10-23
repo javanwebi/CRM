@@ -1,10 +1,60 @@
-import {test,expect} from '@playwright/test';
-test('register → organization → customer → edit → pipeline → logout',async({page},info)=>{
- await page.goto('/');await page.getByRole('button',{name:'ثبت‌نام کنید'}).click();await page.getByLabel('نام و نام خانوادگی').fill('مدیر آزمایش');await page.getByLabel('ایمیل کاری').fill(`e2e-${info.project.name}-${Date.now()}@example.test`);await page.getByLabel('رمز عبور',{exact:true}).fill('BrowserPassword123!');await page.getByRole('button',{name:'ایجاد حساب',exact:true}).click();
- await page.getByRole('button',{name:'ایجاد شرکت',exact:true}).click();await page.getByLabel('نام',{exact:true}).fill('شرکت آزمایشی');await page.getByRole('button',{name:'ذخیره اطلاعات'}).click();await expect(page.getByText('اولین فضای کاری‌تان را بسازید')).toHaveCount(0);
- await page.getByRole('button',{name:'ثبت مشتری',exact:true}).click();await page.getByLabel('نام',{exact:true}).fill('مشتری آزمایشی');await page.getByLabel('ایمیل',{exact:true}).fill('customer@example.test');await page.getByRole('button',{name:'ذخیره اطلاعات'}).click();
- await page.getByRole('button',{name:'مشتریان',exact:true}).click();await expect(page.getByRole('button',{name:'مشتری آزمایشی',exact:true})).toBeVisible();await page.getByRole('button',{name:'ویرایش',exact:true}).click();await page.getByLabel('تلفن',{exact:true}).fill('09123456789');await page.getByRole('button',{name:'ذخیره اطلاعات'}).click();await expect(page.getByText('09123456789',{exact:true})).toBeVisible();
- await page.getByRole('button',{name:'قیف فروش',exact:true}).click();await page.getByRole('button',{name:'افزودن جدید'}).click();await page.getByLabel('نام',{exact:true}).fill('فرصت آزمایشی');await page.getByLabel('قیف',{exact:true}).selectOption({label:'Sales'});await page.getByLabel('مرحله',{exact:true}).selectOption({label:'New'});await page.getByLabel('مبلغ',{exact:true}).fill('150000');await page.getByRole('button',{name:'ذخیره اطلاعات'}).click();await expect(page.getByText('فرصت آزمایشی',{exact:true})).toBeVisible();await page.getByLabel('Stage فرصت آزمایشی').selectOption({label:'Proposal'});await expect(page.locator('.kanban-column').filter({has:page.locator('.column-title',{hasText:'Proposal'})}).getByText('فرصت آزمایشی')).toBeVisible();
- await page.screenshot({path:`test-results/${info.project.name}-pipeline.png`,fullPage:true});
- const overflow=await page.evaluate(()=>document.documentElement.scrollWidth>window.innerWidth);expect(overflow).toBe(false);
+import { test, expect } from "@playwright/test";
+test("register → organization → customer → edit → pipeline → logout", async ({
+  page,
+}, info) => {
+  await page.goto("/");
+  await page.getByRole("button", { name: "ثبت‌نام کنید" }).click();
+  await page.getByLabel("نام و نام خانوادگی").fill("مدیر آزمایش");
+  await page
+    .getByLabel("ایمیل کاری")
+    .fill(`e2e-${info.project.name}-${Date.now()}@example.test`);
+  await page
+    .getByLabel("رمز عبور", { exact: true })
+    .fill("BrowserPassword123!");
+  await page.getByRole("button", { name: "ایجاد حساب", exact: true }).click();
+  await page.getByRole("button", { name: "ایجاد شرکت", exact: true }).click();
+  await page.getByLabel("نام", { exact: true }).fill("شرکت آزمایشی");
+  await page.getByRole("button", { name: "ذخیره اطلاعات" }).click();
+  await expect(page.getByText("اولین فضای کاری‌تان را بسازید")).toHaveCount(0);
+  await page.getByRole("button", { name: "ثبت مشتری", exact: true }).click();
+  await page.getByLabel("نام", { exact: true }).fill("مشتری آزمایشی");
+  await page.getByLabel("ایمیل", { exact: true }).fill("customer@example.test");
+  await page.getByRole("button", { name: "ذخیره اطلاعات" }).click();
+  await page.getByRole("button", { name: "مشتریان", exact: true }).click();
+  await expect(
+    page.getByRole("button", { name: "مشتری آزمایشی", exact: true }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "ویرایش", exact: true }).click();
+  await page.getByLabel("تلفن", { exact: true }).fill("09123456789");
+  await page.getByRole("button", { name: "ذخیره اطلاعات" }).click();
+  await expect(page.getByText("09123456789", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "قیف فروش", exact: true }).click();
+  await page.getByRole("button", { name: "افزودن جدید" }).click();
+  await page.getByLabel("نام", { exact: true }).fill("فرصت آزمایشی");
+  await page
+    .getByLabel("قیف", { exact: true })
+    .selectOption({ label: "Sales" });
+  await page
+    .getByLabel("مرحله", { exact: true })
+    .selectOption({ label: "New" });
+  await page.getByLabel("مبلغ", { exact: true }).fill("150000");
+  await page.getByRole("button", { name: "ذخیره اطلاعات" }).click();
+  await expect(page.getByText("فرصت آزمایشی", { exact: true })).toBeVisible();
+  await page
+    .getByLabel("Stage فرصت آزمایشی")
+    .selectOption({ label: "Proposal" });
+  await expect(
+    page
+      .locator(".kanban-column")
+      .filter({ has: page.locator(".column-title", { hasText: "Proposal" }) })
+      .getByText("فرصت آزمایشی"),
+  ).toBeVisible();
+  await page.screenshot({
+    path: `test-results/${info.project.name}-pipeline.png`,
+    fullPage: true,
+  });
+  const overflow = await page.evaluate(
+    () => document.documentElement.scrollWidth > window.innerWidth,
+  );
+  expect(overflow).toBe(false);
 });

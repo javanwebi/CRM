@@ -4,7 +4,7 @@
   "packageManager": "pnpm@11.25.0",
   "scripts": {
     "build": "turbo build",
-    "lint": "tsc --noEmit",
+    "lint": "eslint . && tsc --noEmit",
     "test": "vitest run",
     "dev": "concurrently \"pnpm --filter @crm/api dev\" \"pnpm --filter @crm/web dev\"",
     "db:migrate": "tsx packages/database/migrate.ts",
@@ -12,15 +12,20 @@
   },
   "devDependencies": {
     "@electric-sql/pglite": "0.3.14",
+    "@eslint/js": "9.39.2",
     "@playwright/test": "1.58.2",
     "@types/node": "22.19.7",
+    "@types/supertest": "6.0.3",
     "concurrently": "9.2.1",
+    "eslint": "9.39.2",
+    "globals": "17.0.0",
+    "prettier": "3.8.1",
+    "supertest": "7.2.2",
     "tsx": "4.21.0",
     "turbo": "2.8.1",
     "typescript": "5.9.3",
-    "vitest": "3.2.4",
-    "supertest": "7.2.2",
-    "@types/supertest": "6.0.3"
+    "typescript-eslint": "8.53.1",
+    "vitest": "3.2.4"
   },
   "type": "module"
 }

@@ -12,8 +12,8 @@ jobs:
           POSTGRES_USER: crm
           POSTGRES_PASSWORD: ci-only-password
           POSTGRES_DB: crm
-        ports: ['5432:5432']
-        options: --health-cmd='pg_isready -U crm' --health-interval=5s --health-retries=20
+        ports: ["5432:5432"]
+        options: --health-cmd pg_isready --health-interval=5s --health-retries=20
     env:
       DATABASE_URL: postgresql://crm:ci-only-password@localhost:5432/crm
     steps:
@@ -37,6 +37,8 @@ jobs:
           pnpm db:migrate
       - run: pnpm exec playwright install --with-deps chromium
       - run: pnpm test:e2e
+        env:
+          E2E_DATABASE_URL: postgresql://crm:ci-only-password@localhost:5432/crm
       - name: Docker Compose startup
         env:
           POSTGRES_PASSWORD: compose-only-test-password
@@ -48,7 +50,7 @@ jobs:
           done
           docker compose logs --no-color
           exit 1
-      - if: always()
+      - if: always() && hashFiles('compose.yaml') != ''
         run: docker compose down
         env:
           POSTGRES_PASSWORD: compose-only-test-password
