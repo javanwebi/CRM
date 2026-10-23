@@ -1,0 +1,26 @@
+{
+  "name": "crm-platform",
+  "private": true,
+  "packageManager": "pnpm@11.25.0",
+  "scripts": {
+    "build": "turbo build",
+    "lint": "tsc --noEmit",
+    "test": "vitest run",
+    "dev": "concurrently \"pnpm --filter @crm/api dev\" \"pnpm --filter @crm/web dev\"",
+    "db:migrate": "tsx packages/database/migrate.ts",
+    "test:e2e": "playwright test"
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "0.3.14",
+    "@playwright/test": "1.58.2",
+    "@types/node": "22.19.7",
+    "concurrently": "9.2.1",
+    "tsx": "4.21.0",
+    "turbo": "2.8.1",
+    "typescript": "5.9.3",
+    "vitest": "3.2.4",
+    "supertest": "7.2.2",
+    "@types/supertest": "6.0.3"
+  },
+  "type": "module"
+}

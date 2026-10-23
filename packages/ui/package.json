@@ -1,0 +1,1 @@
+{"name": "@crm/ui", "private": true, "type": "module", "dependencies": {"react": "19.2.0", "@types/react": "19.2.7", "class-variance-authority": "0.7.1", "clsx": "2.1.1", "tailwind-merge": "3.4.0"}}

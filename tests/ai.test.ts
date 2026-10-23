@@ -1,0 +1,3 @@
+import {it,expect} from 'vitest';
+import {ToolRegistry} from '../packages/ai/src/index';
+it('requires tenant identity and permission; sensitive tools fail closed even with approval ID',async()=>{const registry=new ToolRegistry();registry.register({name:'delete',permission:'crm.write',sensitive:true,execute:async()=>{throw new Error('must never execute');}});await expect(registry.execute('delete',{tenantId:'',userId:'u',permissions:['crm.write']},{})).rejects.toThrow('access denied');await expect(registry.execute('delete',{tenantId:'t',userId:'u',permissions:[],approvalId:'fake'},{})).rejects.toThrow('access denied');await expect(registry.execute('delete',{tenantId:'t',userId:'u',permissions:['crm.write'],approvalId:'fake'},{})).rejects.toThrow('disabled');});

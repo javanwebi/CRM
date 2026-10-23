@@ -1,0 +1,55 @@
+services:
+  postgres:
+    image: postgres:17.6-bookworm
+    environment:
+      POSTGRES_USER: crm
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}
+      POSTGRES_DB: crm
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./docker/init.sql:/docker-entrypoint-initdb.d/00-init.sql:ro
+    healthcheck:
+      test: [CMD-SHELL, pg_isready -U crm]
+      interval: 5s
+      retries: 20
+  redis:
+    image: redis:7.4.2-alpine
+    command: [redis-server, --appendonly, 'yes']
+    volumes: [redis-data:/data]
+    healthcheck:
+      test: [CMD, redis-cli, ping]
+      interval: 5s
+      retries: 20
+  migrate:
+    build: .
+    environment:
+      DATABASE_URL: postgresql://crm:${POSTGRES_PASSWORD}@postgres:5432/crm
+    command: [pnpm, db:migrate]
+    depends_on:
+      postgres: {condition: service_healthy}
+  app:
+    build: .
+    ports: ['${PORT:-3000}:3000']
+    environment:
+      DATABASE_URL: postgresql://crm:${POSTGRES_PASSWORD}@postgres:5432/crm
+      APP_ORIGIN: ${APP_ORIGIN:-http://localhost:3000}
+      PORT: 3000
+      NODE_ENV: ${NODE_ENV:-development}
+    depends_on:
+      migrate: {condition: service_completed_successfully}
+    restart: unless-stopped
+    healthcheck:
+      test: [CMD, node, -e, "fetch('http://localhost:3000/api/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
+      interval: 15s
+      retries: 5
+  worker:
+    build: .
+    command: [pnpm, --filter, '@crm/worker', start]
+    environment:
+      REDIS_URL: redis://redis:6379
+    depends_on:
+      redis: {condition: service_healthy}
+    restart: unless-stopped
+volumes:
+  postgres-data:
+  redis-data:

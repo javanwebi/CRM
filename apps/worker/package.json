@@ -1,0 +1,1 @@
+{"name":"@crm/worker","private":true,"type":"module","scripts":{"build":"tsc --noEmit -p ../../tsconfig.json","start":"tsx src/index.ts"},"dependencies":{"bullmq":"5.67.3","ioredis":"5.9.2","zod":"3.25.76"}}
