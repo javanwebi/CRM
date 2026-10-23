@@ -19,7 +19,7 @@ import {
   Globe,
   Shield,
   Briefcase,
-  Mail,
+
   FileText,
   Phone,
 } from "lucide-react";
