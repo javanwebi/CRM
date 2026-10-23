@@ -253,14 +253,20 @@ export function createApp(
         res.json(
           await authorized(req, res, "crm.read", async (tx, t) => {
             const p = paging.parse(req.query);
-            const where = `tenant_id=$1 AND name ILIKE $2`;
+            let where = `tenant_id=$1 AND name ILIKE $2`;
             const values = [t, `%${p.search}%`];
+            if (p.status) {
+              if (!("status" in schema.shape))
+                throw new HttpError(400, "Status filter unavailable");
+              values.push(p.status);
+              where += " AND status=$3";
+            }
             const [count] = await tx.query<{ total: number }>(
               `SELECT count(*)::int AS total FROM ${table} WHERE ${where}`,
               values,
             );
             const rows = await tx.query(
-              `SELECT * FROM ${table} WHERE ${where} ORDER BY ${p.sort} ${p.order},id LIMIT $3 OFFSET $4`,
+              `SELECT * FROM ${table} WHERE ${where} ORDER BY ${p.sort} ${p.order},id LIMIT $${values.length + 1} OFFSET $${values.length + 2}`,
               [...values, p.limit, (p.page - 1) * p.limit],
             );
             return {

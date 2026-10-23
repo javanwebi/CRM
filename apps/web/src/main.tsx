@@ -19,7 +19,6 @@ import {
   Globe,
   Shield,
   Briefcase,
-
   FileText,
   Phone,
 } from "lucide-react";
@@ -162,7 +161,7 @@ function App() {
       try {
         const path = page === "pipeline" ? "deals" : page;
         const result = await api(
-          `/t/${tenant}/${path}${fields[path] ? `?page=${offset}&limit=25&sort=${sort}&search=${encodeURIComponent(search)}` : ""}`,
+          `/t/${tenant}/${path}${fields[path] ? `?page=${offset}&limit=25&sort=${sort}&search=${encodeURIComponent(search)}&status=${encodeURIComponent(statusFilter)}` : ""}`,
         );
         if (live) setData(result);
         if (
@@ -193,7 +192,7 @@ function App() {
       live = false;
       clearTimeout(timer);
     };
-  }, [user, tenant, page, search, refresh, offset, sort, modal]);
+  }, [user, tenant, page, search, refresh, offset, sort, statusFilter, modal]);
   function open(type: string, row: Row | null = null) {
     setEdit(row);
     setModal(type);
@@ -263,9 +262,7 @@ function App() {
         setLang={() => setLang(fa ? "en" : "fa")}
       />
     );
-  const visibleRows = (data?.data ?? []).filter(
-    (r: Row) => !statusFilter || r.status === statusFilter,
-  );
+  const visibleRows = data?.data ?? [];
   return (
     <div className={`shell ${collapsed ? "compact" : ""}`}>
       <aside className="sidebar">
@@ -354,6 +351,22 @@ function App() {
       </aside>
       <div className="main">
         <header>
+          <select
+            className="mobile-page-select"
+            aria-label="Mobile navigation"
+            value={page}
+            onChange={(e) => {
+              setPage(e.target.value);
+              setSearch("");
+              setStatusFilter("");
+            }}
+          >
+            {menus.map(([id, a, b]) => (
+              <option key={id} value={id}>
+                {tr(a, b)}
+              </option>
+            ))}
+          </select>
           <div className="header-start">
             <button
               className="icon-button"
@@ -636,10 +649,7 @@ function App() {
                           onChange={(e) => setStatusFilter(e.target.value)}
                         >
                           <option value="">
-                            {tr(
-                              "همه وضعیت‌ها (صفحه فعلی)",
-                              "All statuses (current page)",
-                            )}
+                            {tr("همه وضعیت‌ها", "All statuses")}
                           </option>
                           {enums[page].status.map((v) => (
                             <option key={v} value={v}>

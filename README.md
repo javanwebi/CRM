@@ -41,7 +41,7 @@ pnpm dev
 
 Vite runs on port 5173 and proxies `/api` to Express on 3000. For this mode set APP_ORIGIN=http://localhost:5173. `pnpm build` produces the frontend bundle. Express serves it from `apps/web/dist` in deployed installations. A server-only DATABASE_URL using the dedicated crm_server login is recommended for authentication, organization bootstrap and team administration; customer/business operations always switch transaction-locally to the non-BYPASSRLS `crm_runtime` role. The separate MIGRATION_DATABASE_URL belongs only to the migration runner. See the security boundaries below.
 
-For Supabase use the session pooler connection string from **Connect** with SSL, e.g. `?sslmode=require&connection_limit=5`. Never put the database URL in VITE_* or the frontend. The initial migration and runtime-role grant are in `supabase/migrations`. The Supabase Data API is intentionally denied to anon/authenticated for these custom-auth tables. Supabase is used as PostgreSQL hosting, not as a second competing login system.
+For Supabase use the session pooler connection string from **Connect** with SSL, e.g. `?sslmode=require&connection_limit=5`. Never put the database URL in VITE_* or the frontend. The versioned migrations, dedicated backend login and relationship hardening are in `supabase/migrations`. The Supabase Data API is intentionally denied to anon/authenticated for these custom-auth tables. Supabase is used as PostgreSQL hosting, not as a second competing login system.
 
 ## Verification
 
@@ -84,4 +84,4 @@ Collection query: `page`, `limit` (1..100), `search`, `sort` (name/created_at), 
 
 ## Security boundaries and remaining work
 
-See [docs/SECURITY.md](docs/SECURITY.md) and [docs/DELIVERY.md](docs/DELIVERY.md). This is an initial implementation, not a claim that every enterprise requirement is complete. In particular, email verification/recovery, managed delivery, member removal/role reassignment, broad form localization, global search, full relationship timelines and large-catalog selectors are not finished. Do not call it production-ready until deployed flows and CI pass on the chosen host.
+See [docs/SECURITY.md](docs/SECURITY.md) and [docs/DELIVERY.md](docs/DELIVERY.md). This is an initial implementation, not a claim that every enterprise requirement is complete. In particular, email verification/recovery, managed delivery, member removal, broad form localization, global search, full relationship timelines and large-catalog selectors are not finished. Do not call it production-ready until deployed flows and CI pass on the chosen host.

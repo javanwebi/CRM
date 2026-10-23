@@ -167,6 +167,7 @@ export function Auth({
             {tr("رمز عبور", "Password")}
             <input
               type="password"
+              aria-label={tr("رمز عبور", "Password")}
               name="password"
               required
               minLength={12}

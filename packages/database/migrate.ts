@@ -14,6 +14,7 @@ try {
   for (const [name, file] of [
     ["crm_foundation", "foundation.sql"],
     ["backend_login_permissions", "backend-permissions.sql"],
+    ["policy_and_relationship_hardening", "hardening.sql"],
   ]) {
     const done = await client.query(
       "SELECT 1 FROM private.schema_migrations WHERE name=$1",

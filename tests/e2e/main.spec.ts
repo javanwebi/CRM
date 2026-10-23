@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-test("register → organization → customer → edit → pipeline → logout", async ({
+test("register → organization → customer → edit → pipeline", async ({
   page,
 }, info) => {
   await page.goto("/");

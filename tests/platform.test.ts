@@ -24,6 +24,12 @@ beforeAll(async () => {
       "utf8",
     ),
   );
+  await pg.exec(
+    readFileSync(
+      new URL("../packages/database/hardening.sql", import.meta.url),
+      "utf8",
+    ),
+  );
   const executor: Executor = {
     query: async <T>(sql: string, values: unknown[] = []) => {
       const result = await pg.query<T>(sql, values);
@@ -56,36 +62,30 @@ describe.sequential(
       expect((await request(app).get("/api/tenants")).status).toBe(401);
     });
     it("registers users with hashed passwords and private cookies", async () => {
-      const ar = await a
-        .post("/api/auth/register")
-        .send({
-          name: "Alice",
-          email: "alice@example.test",
-          password: "LongSafePassword123!",
-        });
+      const ar = await a.post("/api/auth/register").send({
+        name: "Alice",
+        email: "alice@example.test",
+        password: "LongSafePassword123!",
+      });
       expect(ar.status).toBe(201);
       ua = ar.body.user.id;
       expect(ar.headers["set-cookie"][0]).toContain("HttpOnly");
       expect(ar.body.user.password_hash).toBeUndefined();
-      const br = await b
-        .post("/api/auth/register")
-        .send({
-          name: "Bob",
-          email: "bob@example.test",
-          password: "AnotherSafePassword123!",
-        });
+      const br = await b.post("/api/auth/register").send({
+        name: "Bob",
+        email: "bob@example.test",
+        password: "AnotherSafePassword123!",
+      });
       expect(br.status).toBe(201);
       ub = br.body.user.id;
     });
     it("rejects invalid passwords and untrusted origins", async () => {
       expect(
         (
-          await request(app)
-            .post("/api/auth/login")
-            .send({
-              email: "alice@example.test",
-              password: "WrongPassword123!",
-            })
+          await request(app).post("/api/auth/login").send({
+            email: "alice@example.test",
+            password: "WrongPassword123!",
+          })
         ).status,
       ).toBe(401);
       expect(
@@ -182,15 +182,13 @@ describe.sequential(
       expect(stages.body.data).toHaveLength(5);
       const first = stages.body.data[0],
         second = stages.body.data[1];
-      const r = await a
-        .post(`/api/t/${ta}/deals`)
-        .send({
-          name: "Contract",
-          pipeline_id: pipelines.body.data[0].id,
-          stage_id: first.id,
-          account_id: account,
-          value: 240000,
-        });
+      const r = await a.post(`/api/t/${ta}/deals`).send({
+        name: "Contract",
+        pipeline_id: pipelines.body.data[0].id,
+        stage_id: first.id,
+        account_id: account,
+        value: 240000,
+      });
       expect(r.status).toBe(201);
       const moved = await a
         .patch(`/api/t/${ta}/deals/${r.body.id}`)
@@ -280,13 +278,11 @@ it("dedicated backend login can bootstrap while direct customer SQL remains deni
   const client = request.agent(createApp(restricted));
   expect(
     (
-      await client
-        .post("/api/auth/register")
-        .send({
-          name: "Server role",
-          email: "server-role@example.test",
-          password: "LongServerPassword123!",
-        })
+      await client.post("/api/auth/register").send({
+        name: "Server role",
+        email: "server-role@example.test",
+        password: "LongServerPassword123!",
+      })
     ).status,
   ).toBe(201);
   const organization = await client
