@@ -38,7 +38,12 @@ jobs:
       - run: node --import tsx tests/native-smoke.ts
         env:
           DATABASE_ENV: test
+      - uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-1.58.2
       - run: pnpm exec playwright install --with-deps chromium
+        timeout-minutes: 10
       - run: pnpm test:e2e
         env:
           E2E_DATABASE_URL: postgresql://crm:ci-only-password@localhost:5432/crm
@@ -58,7 +63,7 @@ jobs:
         env:
           POSTGRES_PASSWORD: compose-only-test-password
       - uses: actions/upload-artifact@v4
-        if: failure()
+        if: always()
         with:
           name: browser-test-results
           path: test-results

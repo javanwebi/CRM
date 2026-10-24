@@ -57,6 +57,7 @@ const faFields: Record<string, string> = {
   due_at: "موعد انجام",
   body: "متن یادداشت",
   role_id: "نقش",
+  code: "کد دعوت",
 };
 const fields: Record<string, string[]> = {
   accounts: ["name", "kind", "email", "phone", "description"],
@@ -200,7 +201,8 @@ function App() {
   }
   async function save(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const b = Object.fromEntries(new FormData(event.currentTarget));
+    const formData = new FormData(event.currentTarget);
+    const b = Object.fromEntries(formData);
     setBusy(true);
     setError("");
     try {
@@ -219,7 +221,7 @@ function App() {
       } else if (modal === "role") {
         await api(`/t/${tenant}/roles`, "POST", {
           name: b.name,
-          grants: String(b.grants).split(",").filter(Boolean),
+          grants: formData.getAll("grants"),
         });
       } else if (modal) {
         const body: Record<string, any> = { ...b };
@@ -1056,6 +1058,47 @@ function App() {
                       !edit?.pipeline_id || s.pipeline_id === edit.pipeline_id,
                   );
                 if (k === "role_id") rows = data?.roles;
+                if (k === "grants")
+                  return (
+                    <fieldset key={k} className="permission-options">
+                      <legend>
+                        {tr("دسترسی‌های این نقش", "Role permissions")}
+                      </legend>
+                      {[
+                        ["crm.read", "مشاهده اطلاعات", "Read CRM data"],
+                        [
+                          "crm.write",
+                          "ثبت و ویرایش اطلاعات",
+                          "Create and edit CRM data",
+                        ],
+                        [
+                          "team.manage",
+                          "مدیریت اعضا و نقش‌ها",
+                          "Manage team and roles",
+                        ],
+                        [
+                          "settings.manage",
+                          "مدیریت تنظیمات شرکت",
+                          "Manage organization settings",
+                        ],
+                        [
+                          "ai.run",
+                          "دسترسی به قابلیت‌های هوشمند آینده",
+                          "Access future AI features",
+                        ],
+                      ].map(([key, a, b]) => (
+                        <label key={key}>
+                          <input
+                            type="checkbox"
+                            name="grants"
+                            value={key}
+                            defaultChecked={key === "crm.read"}
+                          />
+                          <span>{tr(a, b)}</span>
+                        </label>
+                      ))}
+                    </fieldset>
+                  );
                 return (
                   <label key={k}>
                     {fa ? (faFields[k] ?? k) : k.replaceAll("_", " ")}
