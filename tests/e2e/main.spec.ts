@@ -54,9 +54,10 @@ test("register → organization → customer → edit → pipeline", async ({
       .filter({ has: page.locator(".column-title", { hasText: "Proposal" }) })
       .getByText("فرصت آزمایشی"),
   ).toBeVisible();
+  await page.evaluate(() => window.scrollTo(0, 0));
   await page.screenshot({
     path: `test-results/${info.project.name}-pipeline.png`,
-    fullPage: true,
+    fullPage: info.project.name !== "mobile",
   });
   const overflow = await page.evaluate(
     () => document.documentElement.scrollWidth > window.innerWidth,

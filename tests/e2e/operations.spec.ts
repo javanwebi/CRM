@@ -73,9 +73,10 @@ test("operations: inbox draft, command search, calendar and workflow builder", a
       )
     ).status(),
   ).toBe(409);
+  await page.evaluate(() => window.scrollTo(0, 0));
   await page.screenshot({
     path: `test-results/${info.project.name}-inbox.png`,
-    fullPage: true,
+    fullPage: info.project.name !== "mobile",
   });
   expect(
     await page.evaluate(
@@ -101,9 +102,10 @@ test("operations: inbox draft, command search, calendar and workflow builder", a
   await expect(
     page.locator(".workflow-card").getByText("پیگیری تمدید", { exact: true }),
   ).toBeVisible();
+  await page.evaluate(() => window.scrollTo(0, 0));
   await page.screenshot({
     path: `test-results/${info.project.name}-workflows.png`,
-    fullPage: true,
+    fullPage: info.project.name !== "mobile",
   });
   await navigate("calendar", "تقویم");
   await page.getByRole("button", { name: "ایجاد جدید", exact: true }).click();
@@ -126,9 +128,10 @@ test("operations: inbox draft, command search, calendar and workflow builder", a
       .locator(".customer-sections")
       .getByText("بررسی تمدید قرارداد", { exact: true }),
   ).toBeVisible();
+  await page.evaluate(() => window.scrollTo(0, 0));
   await page.screenshot({
     path: `test-results/${info.project.name}-customer360.png`,
-    fullPage: true,
+    fullPage: info.project.name !== "mobile",
   });
   await page.getByLabel("Change language").click();
   await expect(page.locator(".page-heading h1")).toHaveText("Customer 360");
