@@ -360,6 +360,7 @@ model Participants {
 }
 
 model Messages {
+ provider_event_id String?
   id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   tenant_id       String   @db.Uuid
   name            String

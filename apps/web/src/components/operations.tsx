@@ -109,6 +109,8 @@ export function Operations({
             name: b.name,
             channel_id: b.channel_id,
             account_id: b.account_id || null,
+            contact_id: b.contact_id || null,
+            deal_id: b.deal_id || null,
           });
       }
       if (page === "workflows")
@@ -123,6 +125,9 @@ export function Operations({
         await api(`${base}/tasks`, "POST", {
           name: b.name,
           due_at: new Date(String(b.due_at)).toISOString(),
+          reminder_at: b.reminder_at
+            ? new Date(String(b.reminder_at)).toISOString()
+            : null,
         });
       setForm(false);
       setRefresh((x) => x + 1);
@@ -404,7 +409,12 @@ export function Operations({
                             "POST",
                           );
                           setSummary(
-                            r.summary ||
+                            (r.mode === "model"
+                              ? tr(
+                                  "پیشنهاد مدل — نیازمند بررسی انسانی\n",
+                                  "Model suggestion — human review required\n",
+                                )
+                              : "") + r.summary ||
                               tr(
                                 "متنی برای مرور وجود ندارد.",
                                 "No text to review.",
@@ -748,7 +758,7 @@ export function Operations({
                         ))}
                       </select>
                     </label>
-                    <CustomerField base={base} fa={fa} />
+                    <RelationshipFields base={base} fa={fa} />
                   </>
                 ) : (
                   <label>
@@ -761,10 +771,16 @@ export function Operations({
                   </label>
                 ))}
               {page === "calendar" && (
-                <label>
-                  {tr("موعد", "Due date")}
-                  <input required type="datetime-local" name="due_at" />
-                </label>
+                <>
+                  <label>
+                    {tr("موعد", "Due date")}
+                    <input required type="datetime-local" name="due_at" />
+                  </label>
+                  <label>
+                    {tr("یادآوری", "Reminder")}
+                    <input type="datetime-local" name="reminder_at" />
+                  </label>
+                </>
               )}
               {page === "workflows" && (
                 <>
@@ -823,29 +839,46 @@ function Empty({
     </div>
   );
 }
-function CustomerField({ base, fa }: { base: string; fa: boolean }) {
-  const [rows, setRows] = useState<Row[]>([]);
+function RelationshipFields({ base, fa }: { base: string; fa: boolean }) {
+  const [refs, setRefs] = useState<Record<string, Row[]>>({}),
+    [error, setError] = useState("");
   useEffect(() => {
     let live = true;
-    api(`${base}/accounts?limit=100`)
-      .then((r) => live && setRows(r.data))
-      .catch(() => {});
+    const tables = ["accounts", "contacts", "deals"];
+    Promise.all(tables.map((t) => api(`${base}/${t}?limit=100`)))
+      .then(
+        (results) =>
+          live &&
+          setRefs(
+            Object.fromEntries(tables.map((t, i) => [t, results[i].data])),
+          ),
+      )
+      .catch((e) => live && setError(e.message));
     return () => {
       live = false;
     };
   }, [base]);
   return (
-    <label>
-      {fa ? "مشتری مرتبط" : "Linked customer"}
-      <select name="account_id">
-        <option value="">—</option>
-        {rows.map((r) => (
-          <option key={r.id} value={r.id}>
-            {r.name}
-          </option>
-        ))}
-      </select>
-    </label>
+    <>
+      {error && <p role="alert">{error}</p>}
+      {[
+        ["accounts", "account_id", fa ? "مشتری مرتبط" : "Linked customer"],
+        ["contacts", "contact_id", fa ? "مخاطب مرتبط" : "Linked contact"],
+        ["deals", "deal_id", fa ? "فرصت مرتبط" : "Linked deal"],
+      ].map(([table, key, label]) => (
+        <label key={key}>
+          {label}
+          <select name={key}>
+            <option value="">—</option>
+            {(refs[table] ?? []).map((r) => (
+              <option key={r.id} value={r.id}>
+                {r.name}
+              </option>
+            ))}
+          </select>
+        </label>
+      ))}
+    </>
   );
 }
 export function CommandPalette({

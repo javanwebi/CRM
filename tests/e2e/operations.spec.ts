@@ -51,9 +51,11 @@ test("operations: inbox draft, command search, calendar and workflow builder", a
   await navigate("inbox", "صندوق ورودی");
   await page.getByRole("button", { name: /بررسی تمدید قرارداد/ }).click();
   await expect(
-    page.getByText("مشتری درخواست بررسی شرایط تمدید قرارداد را دارد.", {
-      exact: true,
-    }),
+    page
+      .locator(".thread-messages")
+      .getByText("مشتری درخواست بررسی شرایط تمدید قرارداد را دارد.", {
+        exact: true,
+      }),
   ).toBeVisible();
   await page.getByLabel("Message body").fill("پیش‌نویس پیگیری فردا");
   await page.getByLabel("Message type").selectOption("draft");

@@ -1,3 +1,4 @@
+import { summarizeConversation } from "../../../packages/ai/src/summary.js";
 import { processOperationJobs } from "../../../packages/shared/src/operation-jobs.js";
 import type { Express, Request, Response, RequestHandler } from "express";
 import { z } from "zod";
@@ -258,19 +259,31 @@ export function installOperations(
             "conversations",
             id,
           );
-          return {
-            mode: "extractive",
-            summary: rows
-              .reverse()
-              .map((r) => r.body)
-              .join("\n")
-              .slice(0, 1800),
-            suggestions: rows.length
-              ? ["Review the conversation and create a follow-up task"]
-              : [],
-            notice:
-              "Local extractive preview; no language model configured. Suggestions require human review.",
-          };
+          const result = await summarizeConversation(
+            rows.reverse().map((r) => r.body),
+            {
+              url: process.env.SUMMARY_ADAPTER_URL,
+              token: process.env.SUMMARY_ADAPTER_TOKEN,
+              enabled: process.env.SUMMARY_ADAPTER_ENABLED === "true",
+            },
+          );
+          const [run] = await tx.query<{ id: string }>(
+            "INSERT INTO ai_runs(tenant_id,requested_by,status) VALUES($1::uuid,$2::uuid,'completed') RETURNING id",
+            [t, res.locals.user.id],
+          );
+          await tx.query(
+            "INSERT INTO execution_logs(tenant_id,run_id,message) VALUES($1::uuid,$2::uuid,$3) RETURNING id",
+            [
+              t,
+              run.id,
+              JSON.stringify({
+                mode: result.mode,
+                operation: "conversation.summary",
+                conversation_id: id,
+              }),
+            ],
+          );
+          return { ...result, run_id: run.id };
         }),
       ),
     ),

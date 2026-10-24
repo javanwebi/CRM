@@ -1,3 +1,4 @@
+import { createHmac } from "node:crypto";
 import { beforeAll, afterAll, describe, it, expect } from "vitest";
 import { PGlite } from "@electric-sql/pglite";
 import { readFileSync } from "node:fs";
@@ -250,12 +251,12 @@ describe.sequential(
         ),
       ).rejects.toThrow();
     });
-    it("keeps AI operations disabled and audit entries immutable", async () => {
+    it("rejects forged AI requester identity and keeps audit entries immutable", async () => {
       await expect(
         scoped(db, ua, (tx) =>
           tx.query(
             "INSERT INTO ai_runs(tenant_id,requested_by) VALUES($1,$2) RETURNING id",
-            [ta, ua],
+            [ta, ub],
           ),
         ),
       ).rejects.toThrow();
@@ -524,6 +525,57 @@ describe.sequential("Phase two operations on PostgreSQL", () => {
         ),
       ).toHaveLength(0);
     });
+  });
+  it("verifies signed ingress, rejects replay signatures, deduplicates messages and rechecks tenant membership", async () => {
+    const secret = "test-only-inbound-secret-32-characters";
+    process.env.INBOUND_CHANNELS_JSON = JSON.stringify({
+      [channel]: { tenantId: ta, userId: ua, secret },
+    });
+    const payload = {
+      event_id: "provider-event-0001",
+      conversation_id: conversation,
+      body: "Inbound renewal request",
+      sender: "customer@example.test",
+    };
+    const stamp = String(Math.floor(Date.now() / 1000));
+    const signature = createHmac("sha256", secret)
+      .update(stamp + "." + JSON.stringify(payload))
+      .digest("hex");
+    expect(
+      (await request(app).post(`/api/inbound/${channel}`).send(payload)).status,
+    ).toBe(401);
+    const deliver = () =>
+      request(app)
+        .post(`/api/inbound/${channel}`)
+        .set("x-crm-timestamp", stamp)
+        .set("x-crm-signature", signature)
+        .send(payload);
+    expect((await deliver()).body.duplicate).toBe(false);
+    expect((await deliver()).body.duplicate).toBe(true);
+    const thread = await a.get(
+      `/api/t/${ta}/conversations/${conversation}/thread`,
+    );
+    expect(
+      thread.body.messages.filter((m: any) => m.direction === "inbound"),
+    ).toHaveLength(1);
+    process.env.INBOUND_CHANNELS_JSON = JSON.stringify({
+      [channel]: { tenantId: ta, userId: outsiderUser, secret },
+    });
+    expect((await deliver()).status).toBe(403);
+    delete process.env.INBOUND_CHANNELS_JSON;
+  });
+  it("delivers a due reminder once and preserves user-specific notification visibility", async () => {
+    const r = await a
+      .post(`/api/t/${ta}/tasks`)
+      .send({ name: "Due reminder", reminder_at: "2020-01-01T09:00:00.000Z" });
+    expect(r.status).toBe(201);
+    await a.post(`/api/t/${ta}/jobs/process`);
+    await a.post(`/api/t/${ta}/jobs/process`);
+    const notifications = await a.get(`/api/t/${ta}/notifications`);
+    expect(
+      notifications.body.filter((n: any) => n.name === "Due reminder"),
+    ).toHaveLength(1);
+    expect((await b.get(`/api/t/${ta}/notifications`)).body).toHaveLength(0);
   });
   it("searches only current tenant and assembles customer 360", async () => {
     const r = await a.get(`/api/t/${ta}/search?q=Renewal`);

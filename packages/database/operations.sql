@@ -50,3 +50,17 @@ ALTER TABLE tasks ADD COLUMN owner_id uuid DEFAULT private.identity(),ADD COLUMN
 GRANT SELECT(tenant_id,owner_id,reminder_at,reminder_sent_at,status) ON tasks TO crm_server;
 CREATE POLICY server_reminder_discovery ON tasks FOR SELECT TO crm_server USING(reminder_at IS NOT NULL AND reminder_sent_at IS NULL);
 CREATE INDEX tasks_reminder ON tasks(tenant_id,owner_id,reminder_at) WHERE reminder_at IS NOT NULL AND reminder_sent_at IS NULL;
+
+GRANT INSERT ON ai_runs,execution_logs TO crm_runtime;
+CREATE POLICY ai_summary_run ON ai_runs FOR INSERT TO crm_runtime WITH CHECK(private.can(tenant_id,'ai.run') AND requested_by=private.identity());
+CREATE POLICY ai_summary_log ON execution_logs FOR INSERT TO crm_runtime WITH CHECK(private.can(tenant_id,'ai.run') AND EXISTS(SELECT 1 FROM ai_runs r WHERE r.tenant_id=execution_logs.tenant_id AND r.id=execution_logs.run_id AND r.requested_by=private.identity()));
+
+ALTER TABLE messages DROP CONSTRAINT messages_direction_check;
+ALTER TABLE messages ADD CONSTRAINT messages_direction_check CHECK(direction IN ('draft','internal','inbound'));
+ALTER TABLE messages ADD COLUMN provider_event_id text,ADD UNIQUE(tenant_id,conversation_id,provider_event_id);
+CREATE FUNCTION private.touch_conversation() RETURNS trigger LANGUAGE plpgsql SET search_path='' AS $$ BEGIN
+ UPDATE public.conversations SET updated_at=now() WHERE tenant_id=NEW.tenant_id AND id=NEW.conversation_id;
+ RETURN NEW;
+END $$;
+REVOKE ALL ON FUNCTION private.touch_conversation() FROM PUBLIC;
+CREATE TRIGGER message_touch AFTER INSERT ON messages FOR EACH ROW EXECUTE FUNCTION private.touch_conversation();

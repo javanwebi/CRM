@@ -53,6 +53,7 @@ const menus = [
   ["pipeline", "قیف فروش", "Sales pipeline", KanbanSquare],
   ["tasks", "وظایف", "Tasks", CheckSquare],
   ["activities", "فعالیت‌ها", "Activities", Phone],
+  ["call_logs", "ثبت تماس", "Call logs", Phone],
   ["notes", "یادداشت‌ها", "Notes", FileText],
   ["team", "اعضای تیم", "Team", Shield],
   ["settings", "تنظیمات", "Settings", Settings],
@@ -72,6 +73,9 @@ const faFields: Record<string, string> = {
   value: "مبلغ",
   currency: "واحد پول",
   due_at: "موعد انجام",
+  reminder_at: "زمان یادآوری",
+  outcome: "نتیجه تماس",
+  duration_seconds: "مدت تماس (ثانیه)",
   body: "متن یادداشت",
   role_id: "نقش",
   code: "کد دعوت",
@@ -89,11 +93,26 @@ const fields: Record<string, string[]> = {
     "currency",
     "status",
   ],
-  tasks: ["name", "status", "due_at", "description"],
+  tasks: [
+    "name",
+    "status",
+    "due_at",
+    "reminder_at",
+    "account_id",
+    "description",
+  ],
+  call_logs: [
+    "name",
+    "account_id",
+    "outcome",
+    "duration_seconds",
+    "description",
+  ],
   activities: ["name", "kind", "account_id", "description"],
   notes: ["name", "body", "account_id"],
 };
 const enums: Record<string, Record<string, string[]>> = {
+  call_logs: { outcome: ["answered", "no_answer", "busy", "follow_up"] },
   accounts: { kind: ["company", "person"] },
   leads: { status: ["new", "qualified", "lost", "converted"] },
   deals: { status: ["open", "won", "lost"], currency: ["IRR", "USD", "EUR"] },
@@ -101,6 +120,10 @@ const enums: Record<string, Record<string, string[]>> = {
   activities: { kind: ["call", "meeting", "email"] },
 };
 const enumFa: Record<string, string> = {
+  answered: "پاسخ داده شد",
+  no_answer: "بدون پاسخ",
+  busy: "اشغال",
+  follow_up: "نیازمند پیگیری",
   company: "حقوقی",
   person: "حقیقی",
   new: "جدید",
@@ -244,8 +267,9 @@ function App() {
         const body: Record<string, any> = { ...b };
         for (const k of Object.keys(body)) {
           if (k.endsWith("_id") && body[k] === "") body[k] = null;
-          if (k === "value") body[k] = Number(body[k]);
-          if (k === "due_at")
+          if (["value", "duration_seconds"].includes(k))
+            body[k] = Number(body[k]);
+          if (["due_at", "reminder_at"].includes(k))
             body[k] = body[k] ? new Date(body[k]).toISOString() : null;
         }
         await api(
@@ -1180,9 +1204,9 @@ function App() {
                         type={
                           k === "email"
                             ? "email"
-                            : k === "value"
+                            : ["value", "duration_seconds"].includes(k)
                               ? "number"
-                              : k === "due_at"
+                              : ["due_at", "reminder_at"].includes(k)
                                 ? "datetime-local"
                                 : "text"
                         }

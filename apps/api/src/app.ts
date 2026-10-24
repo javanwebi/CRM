@@ -1,3 +1,4 @@
+import { installInbound } from "./inbound.js";
 import { installOperations } from "./operations.js";
 import express, {
   type Request,
@@ -34,7 +35,14 @@ export function createApp(
   app.disable("x-powered-by");
   app.set("trust proxy", 1);
   app.use(helmet());
-  app.use(express.json({ limit: "128kb" }));
+  app.use(
+    express.json({
+      limit: "128kb",
+      verify: (req, _res, buf) => {
+        (req as typeof req & { rawBody?: Buffer }).rawBody = buf;
+      },
+    }),
+  );
   app.use(cookieParser());
   app.use("/api", rateLimit({ windowMs: 60_000, limit: 150 }));
   app.use("/api", (req, res, next) => {
@@ -104,6 +112,7 @@ export function createApp(
           });
       }),
     );
+  installInbound(app, db);
   app.use("/api", (req, res, next) => {
     void (async () => {
       if (!req.cookies.crm_session)
