@@ -25,7 +25,7 @@ Inspected clean phase-one source at local 510cecc, remote main 7a915fd. Re-ran a
 - Baseline: 18/18 passed.
 - Expanded local suite: 32/32 passed (PostgreSQL/PGlite RLS/API/workflow and adapter safety tests).
 - Local lint/TypeScript: passed. Production bundle: passed.
-- Native PostgreSQL, Playwright desktop/mobile, and Docker: branch CI pending; do not infer success from phase-one results.
+- Final branch CI: SUCCESS — https://github.com/javanwebi/CRM/actions/runs/40046536849 for executable commit d33504b939c90e3b1b4a070ac4ff9c43881faca0. Native PostgreSQL migrations passed twice, Prisma/API smoke including automatic workflow passed, all four desktop/mobile Playwright flows passed, and Docker Compose/Redis/BullMQ task execution passed. These are phase-two results, not reused phase-one evidence.
 - Initial new tests failed because phase-one fixtures logged out Alice and invited Bob into tenant A. Fixed by re-authenticating Alice and introducing a genuinely independent outsider. The corrected isolation assertions pass.
 
 ## Installation / review
@@ -46,7 +46,7 @@ Summary service: set `SUMMARY_ADAPTER_ENABLED=true`, `SUMMARY_ADAPTER_URL` and `
 
 First branch CI run 40045498218 passed native PostgreSQL/migration and legacy browser flows, failed the two new browser flows because a text locator matched both conversation preview and message. Fixed locator scopes to `.thread-messages`. Docker was skipped after this failure; rerun required.
 
-Second CI run 40045805299 passed native PostgreSQL/migration and both legacy browser flows. New inbox and command search steps passed; workflow test found a missing explicit accessible label on the trigger select (nested option text changed the implicit label). Added explicit labels to operations selects. Follow-up UI changes add Radix focus trapping/Escape handling, single header command search, new-channel creation, explicit human-approved follow-up creation, workflow queue/replay controls and Persian/Gregorian monthly calendar. Final rerun pending.
+Second CI run 40045805299 passed native PostgreSQL/migration and both legacy browser flows. New inbox and command search steps passed; workflow test found a missing explicit accessible label on the trigger select (nested option text changed the implicit label). Added explicit labels to operations selects. Follow-up UI changes add Radix focus trapping/Escape handling, single header command search, new-channel creation, explicit human-approved follow-up creation, workflow queue/replay controls and Persian/Gregorian monthly calendar. Final rerun succeeded; see verification evidence above.
 
 ## Changed modules and commits
 
@@ -67,5 +67,15 @@ Remote commits (canonical GitHub history):
 | 05fc7c5 | Signed inbound, reminders and optional summary adapter |
 | 5e33af3 | Dialog accessibility, calendar and queue controls |
 | 8757a44 | Calendar boundary tests and adapter configuration hardening |
+| a36a84e | Reminder rearming and forced audit failure rollback tests |
+| d33504b | Dedicated mobile conversation layout and viewport screenshots |
 
 Local tests additionally prove savepoint rollback of task effects when completion audit fails, dead-letter replay eligibility, one-time reminders and rearming on schedule changes. These changes are included in the subsequent verification commit. Revoked memberships are skipped by the worker and cannot execute queued work; their pending jobs are retained for administrator investigation rather than executed with elevated privileges.
+
+## Final review state
+
+Draft PR: https://github.com/javanwebi/CRM/pull/1. 32 changed source/config/test/documentation files; separate branch only. No merge, production deployment or production database changes were performed. No customer messages were transmitted and no real model/provider secrets were installed. Test fixtures exist only in ephemeral CI/local databases.
+
+Final CI job 120729439579 confirms 32 unit/integration tests, 4 Playwright tests (legacy CRM and operations flows, each desktop/mobile), PostgreSQL migration idempotence, native Prisma/API smoke, healthy Compose startup, Redis PONG, disabled sensitive AI worker rejection, and real BullMQ → scoped PostgreSQL → workflow task creation. Browser screenshots are attached as `browser-test-results`, artifact 12541637455. Desktop inbox, workflows, customer 360 and mobile inbox screenshots were visually reviewed. Local Chromium download failed due a truncated network download and Docker is unavailable locally; both checks therefore ran successfully in GitHub-hosted CI. Offline Prisma schema validation passed after supplying a placeholder DATABASE_URL (no database connection required). Source/migration SQL checksums match and git diff whitespace checks passed.
+
+Remaining provider-specific bridges, real AI provider configuration, attachments, high-volume cursor pagination and richer workflow/calendar features are explicitly listed above. The current phase provides operational core flows and adapter boundaries; it does not claim those integrations are live.
