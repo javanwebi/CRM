@@ -695,7 +695,7 @@ function App() {
                                       </span>
                                       {row[k]}
                                     </button>
-                                  ) : k === "status" ? (
+                                  ) : ["status", "kind"].includes(k) ? (
                                     <span className={`badge ${row[k]}`}>
                                       {fa ? (enumFa[row[k]] ?? row[k]) : row[k]}
                                     </span>
@@ -1051,6 +1051,9 @@ function App() {
                       ? ["name", "grants"]
                       : (fields[modal ?? ""] ?? [])
               ).map((k) => {
+                const fieldLabel = fa
+                  ? (faFields[k] ?? k)
+                  : k.replaceAll("_", " ");
                 const opts = enums[modal ?? ""]?.[k];
                 let rows: Row[] | undefined;
                 if (k === "account_id") rows = references.accounts;
@@ -1092,6 +1095,8 @@ function App() {
                       ].map(([key, a, b]) => (
                         <label key={key}>
                           <input
+                            aria-label={tr(a, b)}
+                            required={key === "crm.read"}
                             type="checkbox"
                             name="grants"
                             value={key}
@@ -1107,6 +1112,7 @@ function App() {
                     {fa ? (faFields[k] ?? k) : k.replaceAll("_", " ")}
                     {rows ? (
                       <select
+                        aria-label={fieldLabel}
                         required={k !== "account_id"}
                         name={k}
                         defaultValue={edit?.[k] ?? ""}
@@ -1127,7 +1133,11 @@ function App() {
                         ))}
                       </select>
                     ) : opts ? (
-                      <select name={k} defaultValue={edit?.[k] ?? opts[0]}>
+                      <select
+                        aria-label={fieldLabel}
+                        name={k}
+                        defaultValue={edit?.[k] ?? opts[0]}
+                      >
                         {opts.map((v) => (
                           <option key={v} value={v}>
                             {fa ? (enumFa[v] ?? v) : v}
@@ -1136,12 +1146,14 @@ function App() {
                       </select>
                     ) : ["description", "body"].includes(k) ? (
                       <textarea
+                        aria-label={fieldLabel}
                         name={k}
                         defaultValue={edit?.[k] ?? ""}
                         required={k === "body"}
                       />
                     ) : (
                       <input
+                        aria-label={fieldLabel}
                         name={k}
                         type={
                           k === "email"
