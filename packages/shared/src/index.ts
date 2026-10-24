@@ -20,6 +20,44 @@ export const paging = z.object({
   order: z.enum(["asc", "desc"]).default("desc"),
 });
 export const resources = {
+  channels: z.object({
+    name: z.string().min(1).max(200),
+    kind: z.enum(["email", "sms", "whatsapp", "internal"]),
+    enabled: z.literal(false).default(false),
+  }),
+  conversations: z.object({
+    name: z.string().min(1).max(200),
+    channel_id: uuid,
+    account_id: uuid.nullable().default(null),
+    contact_id: uuid.nullable().default(null),
+    deal_id: uuid.nullable().default(null),
+    status: z.enum(["open", "pending", "closed"]).default("open"),
+  }),
+  participants: z.object({
+    name: z.string().min(1).max(200),
+    conversation_id: uuid,
+    address: z.string().min(1).max(254),
+  }),
+  messages: z.object({
+    name: z.string().min(1).max(200).default("Draft"),
+    conversation_id: uuid,
+    body: z.string().min(1).max(20000),
+    direction: z.enum(["draft", "internal"]).default("draft"),
+  }),
+  call_logs: z.object({
+    name: z.string().min(1).max(200),
+    account_id: uuid.nullable().default(null),
+    outcome: z.enum(["answered", "no_answer", "busy", "follow_up"]),
+    duration_seconds: z.number().int().min(0).max(86400).default(0),
+    description: z.string().max(5000).default(""),
+  }),
+  workflows: z.object({
+    name: z.string().min(1).max(200),
+    trigger: z.enum(["conversation.created", "manual"]),
+    condition_status: z.enum(["open", "pending", "closed"]).default("open"),
+    action: z.enum(["task.create", "notification.create"]),
+    enabled: z.boolean().default(false),
+  }),
   accounts: z.object({
     name: z.string().min(1).max(200),
     kind: z.enum(["company", "person"]).default("company"),
@@ -56,6 +94,8 @@ export const resources = {
     status: z.enum(["open", "won", "lost"]).default("open"),
   }),
   tasks: z.object({
+    account_id: uuid.nullable().default(null),
+    reminder_at: z.string().datetime().nullable().default(null),
     name: z.string().min(1).max(200),
     status: z.enum(["todo", "doing", "done"]).default("todo"),
     due_at: z.string().datetime().nullable().default(null),

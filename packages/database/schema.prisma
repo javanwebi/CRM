@@ -1,286 +1,441 @@
 generator client {
   provider = "prisma-client-js"
 }
+
 datasource db {
   provider = "postgresql"
-  url = env("DATABASE_URL")
-  schemas = ["public", "private"]
+  url      = env("DATABASE_URL")
+  schemas  = ["public", "private"]
 }
 
 model Users {
-  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  email String @unique
-  name String 
-  password_hash String 
-  created_at DateTime @default(now()) @db.Timestamptz
+  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  email         String   @unique
+  name          String
+  password_hash String
+  created_at    DateTime @default(now()) @db.Timestamptz
+
   @@map("users")
   @@schema("public")
 }
 
 model Sessions {
-  id String @id
-  user_id String @db.Uuid
+  id         String   @id
+  user_id    String   @db.Uuid
   expires_at DateTime @db.Timestamptz
+
   @@map("sessions")
   @@schema("private")
 }
 
 model Tenants {
-  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  name String 
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name       String
   created_at DateTime @default(now()) @db.Timestamptz
+
   @@map("tenants")
   @@schema("public")
 }
 
 model Roles {
-  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  tenant_id String @db.Uuid
-  name String 
-  grants String[] @default([])
-  @@unique([tenant_id,id])
-  @@unique([tenant_id,name])
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenant_id String   @db.Uuid
+  name      String
+  grants    String[] @default([])
+
+  @@unique([tenant_id, id])
+  @@unique([tenant_id, name])
   @@map("roles")
   @@schema("public")
 }
 
 model Permissions {
   key String @id
+
   @@map("permissions")
   @@schema("public")
 }
 
 model Memberships {
-  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  id        String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   tenant_id String @db.Uuid
-  user_id String @db.Uuid
-  role_id String @db.Uuid
-  @@unique([tenant_id,user_id])
+  user_id   String @db.Uuid
+  role_id   String @db.Uuid
+
+  @@unique([tenant_id, user_id])
   @@map("memberships")
   @@schema("public")
 }
 
 model TenantSettings {
-  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  id        String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   tenant_id String @unique @db.Uuid
-  locale String @default("fa")
-  currency String @default("IRR")
-  timezone String @default("Asia/Tehran")
+  locale    String @default("fa")
+  currency  String @default("IRR")
+  timezone  String @default("Asia/Tehran")
+
   @@map("tenant_settings")
   @@schema("public")
 }
 
 model Accounts {
-  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  tenant_id String @db.Uuid
-  name String 
-  created_at DateTime @default(now()) @db.Timestamptz
-  updated_at DateTime @default(now()) @db.Timestamptz
-  kind String @default("company")
-  email String @default("")
-  phone String @default("")
-  description String @default("")
-  @@unique([tenant_id,id])
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenant_id   String   @db.Uuid
+  name        String
+  created_at  DateTime @default(now()) @db.Timestamptz
+  updated_at  DateTime @default(now()) @db.Timestamptz
+  kind        String   @default("company")
+  email       String   @default("")
+  phone       String   @default("")
+  description String   @default("")
+
+  @@unique([tenant_id, id])
   @@map("accounts")
   @@schema("public")
 }
 
 model Contacts {
-  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  tenant_id String @db.Uuid
-  name String 
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenant_id  String   @db.Uuid
+  name       String
   created_at DateTime @default(now()) @db.Timestamptz
   updated_at DateTime @default(now()) @db.Timestamptz
-  email String @default("")
-  phone String @default("")
-  account_id String? @db.Uuid
-  @@unique([tenant_id,id])
+  email      String   @default("")
+  phone      String   @default("")
+  account_id String?  @db.Uuid
+
+  @@unique([tenant_id, id])
   @@map("contacts")
   @@schema("public")
 }
 
 model Leads {
-  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  tenant_id String @db.Uuid
-  name String 
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenant_id  String   @db.Uuid
+  name       String
   created_at DateTime @default(now()) @db.Timestamptz
   updated_at DateTime @default(now()) @db.Timestamptz
-  email String @default("")
-  status String @default("new")
-  source String @default("")
-  @@unique([tenant_id,id])
+  email      String   @default("")
+  status     String   @default("new")
+  source     String   @default("")
+
+  @@unique([tenant_id, id])
   @@map("leads")
   @@schema("public")
 }
 
 model Pipelines {
-  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  tenant_id String @db.Uuid
-  name String 
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenant_id  String   @db.Uuid
+  name       String
   created_at DateTime @default(now()) @db.Timestamptz
   updated_at DateTime @default(now()) @db.Timestamptz
-  @@unique([tenant_id,id])
+
+  @@unique([tenant_id, id])
   @@map("pipelines")
   @@schema("public")
 }
 
 model PipelineStages {
-  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  tenant_id String @db.Uuid
-  name String 
-  created_at DateTime @default(now()) @db.Timestamptz
-  updated_at DateTime @default(now()) @db.Timestamptz
-  pipeline_id String @db.Uuid
-  position Int 
-  probability Int @default(0)
-  @@unique([tenant_id,id])
-  @@unique([tenant_id,pipeline_id,id])
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenant_id   String   @db.Uuid
+  name        String
+  created_at  DateTime @default(now()) @db.Timestamptz
+  updated_at  DateTime @default(now()) @db.Timestamptz
+  pipeline_id String   @db.Uuid
+  position    Int
+  probability Int      @default(0)
+
+  @@unique([tenant_id, id])
+  @@unique([tenant_id, pipeline_id, id])
   @@map("pipeline_stages")
   @@schema("public")
 }
 
 model Deals {
-  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  tenant_id String @db.Uuid
-  name String 
-  created_at DateTime @default(now()) @db.Timestamptz
-  updated_at DateTime @default(now()) @db.Timestamptz
-  account_id String? @db.Uuid
-  pipeline_id String @db.Uuid
-  stage_id String @db.Uuid
-  value Decimal @default(0) @db.Decimal(18, 2)
-  currency String @default("IRR")
-  status String @default("open")
-  @@unique([tenant_id,id])
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenant_id   String   @db.Uuid
+  name        String
+  created_at  DateTime @default(now()) @db.Timestamptz
+  updated_at  DateTime @default(now()) @db.Timestamptz
+  account_id  String?  @db.Uuid
+  pipeline_id String   @db.Uuid
+  stage_id    String   @db.Uuid
+  value       Decimal  @default(0) @db.Decimal(18, 2)
+  currency    String   @default("IRR")
+  status      String   @default("open")
+
+  @@unique([tenant_id, id])
   @@map("deals")
   @@schema("public")
 }
 
 model Activities {
-  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  tenant_id String @db.Uuid
-  name String 
-  created_at DateTime @default(now()) @db.Timestamptz
-  updated_at DateTime @default(now()) @db.Timestamptz
-  kind String @default("call")
-  account_id String? @db.Uuid
-  description String @default("")
-  @@unique([tenant_id,id])
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenant_id   String   @db.Uuid
+  name        String
+  created_at  DateTime @default(now()) @db.Timestamptz
+  updated_at  DateTime @default(now()) @db.Timestamptz
+  kind        String   @default("call")
+  account_id  String?  @db.Uuid
+  description String   @default("")
+
+  @@unique([tenant_id, id])
   @@map("activities")
   @@schema("public")
 }
 
 model Tasks {
-  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  tenant_id String @db.Uuid
-  name String 
-  created_at DateTime @default(now()) @db.Timestamptz
-  updated_at DateTime @default(now()) @db.Timestamptz
-  status String @default("todo")
-  due_at DateTime? @db.Timestamptz
-  description String @default("")
-  @@unique([tenant_id,id])
+  id               String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenant_id        String    @db.Uuid
+  name             String
+  created_at       DateTime  @default(now()) @db.Timestamptz
+  updated_at       DateTime  @default(now()) @db.Timestamptz
+  status           String    @default("todo")
+  due_at           DateTime? @db.Timestamptz
+  description      String    @default("")
+  account_id       String?   @db.Uuid
+  reminder_at      DateTime? @db.Timestamptz
+  reminder_sent_at DateTime? @db.Timestamptz
+  owner_id         String?   @default(dbgenerated("private.identity()")) @db.Uuid
+
+  @@unique([tenant_id, id])
   @@map("tasks")
   @@schema("public")
 }
 
 model Notes {
-  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  tenant_id String @db.Uuid
-  name String 
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenant_id  String   @db.Uuid
+  name       String
   created_at DateTime @default(now()) @db.Timestamptz
   updated_at DateTime @default(now()) @db.Timestamptz
-  body String 
-  account_id String? @db.Uuid
-  @@unique([tenant_id,id])
+  body       String
+  account_id String?  @db.Uuid
+
+  @@unique([tenant_id, id])
   @@map("notes")
   @@schema("public")
 }
 
 model AuditLogs {
-  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  tenant_id String @db.Uuid
-  actor_id String @db.Uuid
-  action String 
-  resource String 
-  record_id String? @db.Uuid
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenant_id  String   @db.Uuid
+  actor_id   String   @db.Uuid
+  action     String
+  resource   String
+  record_id  String?  @db.Uuid
   created_at DateTime @default(now()) @db.Timestamptz
+
   @@map("audit_logs")
   @@schema("public")
 }
 
 model Invitations {
-  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  tenant_id String @db.Uuid
-  email String 
-  role_id String @db.Uuid
-  token_hash String @unique
-  expires_at DateTime @db.Timestamptz
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenant_id   String    @db.Uuid
+  email       String
+  role_id     String    @db.Uuid
+  token_hash  String    @unique
+  expires_at  DateTime  @db.Timestamptz
   accepted_at DateTime? @db.Timestamptz
+
   @@map("invitations")
   @@schema("private")
 }
 
 model AiRuns {
-  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  tenant_id String @db.Uuid
-  created_at DateTime @default(now()) @db.Timestamptz
-  status String @default("pending")
-  requested_by String @db.Uuid
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenant_id    String   @db.Uuid
+  created_at   DateTime @default(now()) @db.Timestamptz
+  status       String   @default("pending")
+  requested_by String   @db.Uuid
+
+  @@unique([tenant_id, id])
   @@map("ai_runs")
   @@schema("public")
-  @@unique([tenant_id,id])
 }
 
 model ToolRegistry {
-  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  tenant_id String @db.Uuid
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenant_id  String   @db.Uuid
   created_at DateTime @default(now()) @db.Timestamptz
-  name String 
-  permission String 
-  sensitive Boolean @default(true)
+  name       String
+  permission String
+  sensitive  Boolean  @default(true)
+
+  @@unique([tenant_id, id])
   @@map("tool_registry")
   @@schema("public")
-  @@unique([tenant_id,id])
 }
 
 model ToolPermissions {
-  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  tenant_id String @db.Uuid
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenant_id  String   @db.Uuid
   created_at DateTime @default(now()) @db.Timestamptz
-  tool_id String @db.Uuid
-  role_id String @db.Uuid
+  tool_id    String   @db.Uuid
+  role_id    String   @db.Uuid
+
   @@map("tool_permissions")
   @@schema("public")
 }
 
 model ApprovalRequests {
-  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  tenant_id String @db.Uuid
-  created_at DateTime @default(now()) @db.Timestamptz
-  run_id String @db.Uuid
-  status String @default("pending")
-  approved_by String? @db.Uuid
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenant_id   String   @db.Uuid
+  created_at  DateTime @default(now()) @db.Timestamptz
+  run_id      String   @db.Uuid
+  status      String   @default("pending")
+  approved_by String?  @db.Uuid
+
   @@map("approval_requests")
   @@schema("public")
 }
 
 model ExecutionLogs {
-  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  tenant_id String @db.Uuid
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenant_id  String   @db.Uuid
   created_at DateTime @default(now()) @db.Timestamptz
-  run_id String @db.Uuid
-  message String 
+  run_id     String   @db.Uuid
+  message    String
+
   @@map("execution_logs")
   @@schema("public")
 }
 
 model BackgroundJobs {
-  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  tenant_id String @db.Uuid
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenant_id  String   @db.Uuid
   created_at DateTime @default(now()) @db.Timestamptz
-  status String @default("pending")
-  payload Json @default("{}")
+  status     String   @default("pending")
+  payload    Json     @default("{}")
+
   @@map("background_jobs")
+  @@schema("public")
+}
+
+model Channels {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenant_id  String   @db.Uuid
+  name       String
+  created_at DateTime @default(now()) @db.Timestamptz
+  updated_at DateTime @default(now()) @db.Timestamptz
+  kind       String
+  enabled    Boolean  @default(false)
+
+  @@index([tenant_id, created_at])
+  @@map("channels")
+  @@schema("public")
+}
+
+model Conversations {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenant_id  String   @db.Uuid
+  name       String
+  created_at DateTime @default(now()) @db.Timestamptz
+  updated_at DateTime @default(now()) @db.Timestamptz
+  channel_id String   @db.Uuid
+  account_id String?  @db.Uuid
+  contact_id String?  @db.Uuid
+  deal_id    String?  @db.Uuid
+  status     String   @default("open")
+
+  @@index([tenant_id, created_at])
+  @@map("conversations")
+  @@schema("public")
+}
+
+model Participants {
+  id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenant_id       String   @db.Uuid
+  name            String
+  created_at      DateTime @default(now()) @db.Timestamptz
+  updated_at      DateTime @default(now()) @db.Timestamptz
+  conversation_id String   @db.Uuid
+  address         String
+
+  @@index([tenant_id, created_at])
+  @@map("participants")
+  @@schema("public")
+}
+
+model Messages {
+  id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenant_id       String   @db.Uuid
+  name            String
+  created_at      DateTime @default(now()) @db.Timestamptz
+  updated_at      DateTime @default(now()) @db.Timestamptz
+  conversation_id String   @db.Uuid
+  body            String
+  direction       String   @default("draft")
+
+  @@index([tenant_id, created_at])
+  @@map("messages")
+  @@schema("public")
+}
+
+model Notifications {
+  id         String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenant_id  String    @db.Uuid
+  name       String
+  created_at DateTime  @default(now()) @db.Timestamptz
+  updated_at DateTime  @default(now()) @db.Timestamptz
+  user_id    String    @db.Uuid
+  read_at    DateTime? @db.Timestamptz
+
+  @@index([tenant_id, created_at])
+  @@map("notifications")
+  @@schema("public")
+}
+
+model CallLogs {
+  id               String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenant_id        String   @db.Uuid
+  name             String
+  created_at       DateTime @default(now()) @db.Timestamptz
+  updated_at       DateTime @default(now()) @db.Timestamptz
+  account_id       String?  @db.Uuid
+  outcome          String
+  duration_seconds Int      @default(0)
+  description      String   @default("")
+
+  @@index([tenant_id, created_at])
+  @@map("call_logs")
+  @@schema("public")
+}
+
+model Workflows {
+  id               String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenant_id        String   @db.Uuid
+  name             String
+  created_at       DateTime @default(now()) @db.Timestamptz
+  updated_at       DateTime @default(now()) @db.Timestamptz
+  trigger          String
+  condition_status String   @default("open")
+  action           String
+  enabled          Boolean  @default(false)
+
+  @@index([tenant_id, created_at])
+  @@map("workflows")
+  @@schema("public")
+}
+
+model OperationJobs {
+  id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenant_id       String   @db.Uuid
+  name            String
+  created_at      DateTime @default(now()) @db.Timestamptz
+  updated_at      DateTime @default(now()) @db.Timestamptz
+  workflow_id     String   @db.Uuid
+  conversation_id String   @db.Uuid
+  requested_by    String   @db.Uuid
+  idempotency_key String
+  status          String   @default("pending")
+  attempts        Int      @default(0)
+  available_at    DateTime @default(now()) @db.Timestamptz
+  last_error      String?
+
+  @@index([tenant_id, created_at])
+  @@map("operation_jobs")
   @@schema("public")
 }
