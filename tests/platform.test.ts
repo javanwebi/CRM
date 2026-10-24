@@ -36,6 +36,12 @@ beforeAll(async () => {
       "utf8",
     ),
   );
+  await pg.exec(
+    readFileSync(
+      new URL("../packages/database/operations.sql", import.meta.url),
+      "utf8",
+    ),
+  );
   const executor: Executor = {
     query: async <T>(sql: string, values: unknown[] = []) => {
       const result = await pg.query<T>(sql, values);
@@ -333,13 +339,11 @@ describe.sequential(
         .send({ name: "Editor", grants: ["crm.read", "crm.write"] });
       expect(editor.status).toBe(201);
       const c = request.agent(app);
-      const signup = await c
-        .post("/api/auth/register")
-        .send({
-          name: "Carla",
-          email: "carla@example.test",
-          password: "WriterPassword123!",
-        });
+      const signup = await c.post("/api/auth/register").send({
+        name: "Carla",
+        email: "carla@example.test",
+        password: "WriterPassword123!",
+      });
       expect(signup.status).toBe(201);
       const invitation = await a
         .post(`/api/t/${ta}/invitations`)
@@ -407,4 +411,243 @@ it("dedicated backend login can bootstrap while direct customer SQL remains deni
     .send({ name: "Scoped write" });
   expect(customer.status).toBe(201);
   await expect(restricted.query("SELECT * FROM accounts")).rejects.toThrow();
+});
+
+describe.sequential("Phase two operations on PostgreSQL", () => {
+  let outsider: ReturnType<typeof request.agent>,
+    outsiderUser: string,
+    outsiderTenant: string;
+  beforeAll(async () => {
+    outsider = request.agent(app);
+    const r = await outsider.post("/api/auth/register").send({
+      name: "Outside",
+      email: "outside@example.test",
+      password: "OutsidePassword123!",
+    });
+    outsiderUser = r.body.user.id;
+    outsiderTenant = (
+      await outsider.post("/api/tenants").send({ name: "Outside organization" })
+    ).body.id;
+    expect(
+      (
+        await a.post("/api/auth/login").send({
+          email: "alice@example.test",
+          password: "LongSafePassword123!",
+        })
+      ).status,
+    ).toBe(200);
+  });
+  let channel: string, conversation: string, workflow: string, job: string;
+  it("creates a disabled channel and prevents external delivery", async () => {
+    const r = await a
+      .post(`/api/t/${ta}/channels`)
+      .send({ name: "Support", kind: "email" });
+    expect(r.status).toBe(201);
+    channel = r.body.id;
+    expect(r.body.enabled).toBe(false);
+    expect(
+      (
+        await a
+          .patch(`/api/t/${ta}/channels/${channel}`)
+          .send({ enabled: true })
+      ).status,
+    ).toBe(400);
+    expect(
+      (
+        await outsider
+          .post(`/api/t/${ta}/channels`)
+          .send({ name: "Foreign", kind: "sms" })
+      ).status,
+    ).toBe(403);
+  });
+  it("links conversation to customer and blocks cross-tenant references", async () => {
+    const r = await a.post(`/api/t/${ta}/conversations`).send({
+      name: "Renewal discussion",
+      channel_id: channel,
+      account_id: account,
+    });
+    expect(r.status).toBe(201);
+    conversation = r.body.id;
+    expect(
+      (
+        await outsider
+          .post(`/api/t/${outsiderTenant}/conversations`)
+          .send({ name: "Forged", channel_id: channel })
+      ).status,
+    ).toBe(400);
+    expect(
+      (
+        await a
+          .post(`/api/t/${ta}/conversations/${conversation}/send`)
+          .send({ body: "Do not send" })
+      ).status,
+    ).toBe(409);
+  });
+  it("stores internal notes and drafts, validates participants, and scopes the inbox", async () => {
+    expect(
+      (
+        await a.post(`/api/t/${ta}/messages`).send({
+          conversation_id: conversation,
+          body: "Please follow up next week",
+          direction: "internal",
+        })
+      ).status,
+    ).toBe(201);
+    expect(
+      (
+        await a.post(`/api/t/${ta}/participants`).send({
+          name: "Customer",
+          address: "customer@example.test",
+          conversation_id: conversation,
+        })
+      ).status,
+    ).toBe(201);
+    expect(
+      (await a.get(`/api/t/${ta}/conversations/${conversation}/thread`)).body
+        .messages,
+    ).toHaveLength(1);
+    expect((await outsider.get(`/api/t/${ta}/inbox`)).status).toBe(403);
+    expect(
+      (await outsider.get(`/api/t/${outsiderTenant}/inbox`)).body.conversations,
+    ).toHaveLength(0);
+    await scoped(db, outsiderUser, async (tx) => {
+      expect(
+        await tx.query(
+          "SELECT * FROM messages WHERE conversation_id=$1::uuid",
+          [conversation],
+        ),
+      ).toHaveLength(0);
+      expect(
+        await tx.query(
+          "UPDATE conversations SET status=$2 WHERE id=$1::uuid RETURNING id",
+          [conversation, "closed"],
+        ),
+      ).toHaveLength(0);
+    });
+  });
+  it("searches only current tenant and assembles customer 360", async () => {
+    const r = await a.get(`/api/t/${ta}/search?q=Renewal`);
+    expect(r.status).toBe(200);
+    expect(r.body.some((x: any) => x.id === conversation)).toBe(true);
+    expect(
+      (await outsider.get(`/api/t/${outsiderTenant}/search?q=Renewal`)).body,
+    ).toHaveLength(0);
+    const detail = await a.get(`/api/t/${ta}/customers/${account}/360`);
+    expect(
+      detail.body.conversations.some((x: any) => x.id === conversation),
+    ).toBe(true);
+  });
+  it("records call outcomes, scheduled tasks and extractive summaries", async () => {
+    expect(
+      (
+        await a.post(`/api/t/${ta}/call_logs`).send({
+          name: "Renewal call",
+          account_id: account,
+          outcome: "follow_up",
+          duration_seconds: 85,
+        })
+      ).status,
+    ).toBe(201);
+    expect(
+      (
+        await a.post(`/api/t/${ta}/tasks`).send({
+          name: "Follow up renewal",
+          account_id: account,
+          due_at: "2026-11-01T10:00:00.000Z",
+          reminder_at: "2026-11-01T09:00:00.000Z",
+        })
+      ).status,
+    ).toBe(201);
+    expect(
+      (await a.get(`/api/t/${ta}/calendar`)).body.some(
+        (x: any) => x.name === "Follow up renewal",
+      ),
+    ).toBe(true);
+    const r = await a.post(
+      `/api/t/${ta}/conversations/${conversation}/summary`,
+    );
+    expect(r.status).toBe(200);
+    expect(r.body.mode).toBe("extractive");
+    expect(r.body.summary).toContain("follow up");
+  });
+  it("executes workflow once despite duplicate enqueue and repeated drains", async () => {
+    const w = await a.post(`/api/t/${ta}/workflows`).send({
+      name: "Renewal follow-up workflow",
+      trigger: "manual",
+      action: "notification.create",
+      enabled: true,
+    });
+    expect(w.status).toBe(201);
+    workflow = w.body.id;
+    const body = {
+      conversation_id: conversation,
+      idempotency_key: "renewal-event-0001",
+    };
+    const j = await a
+      .post(`/api/t/${ta}/workflows/${workflow}/enqueue`)
+      .send(body);
+    expect(j.status).toBe(202);
+    job = j.body.id;
+    expect(
+      (await a.post(`/api/t/${ta}/workflows/${workflow}/enqueue`).send(body))
+        .body.id,
+    ).toBe(job);
+    expect((await a.post(`/api/t/${ta}/jobs/process`)).status).toBe(200);
+    expect((await a.post(`/api/t/${ta}/jobs/process`)).body.processed).toBe(0);
+    const notifications = await a.get(`/api/t/${ta}/notifications`);
+    expect(
+      notifications.body.filter(
+        (x: any) => x.name === "Renewal follow-up workflow",
+      ),
+    ).toHaveLength(1);
+    const n = notifications.body[0];
+    expect(
+      (await a.post(`/api/t/${ta}/notifications/${n.id}/read`)).body.data[0]
+        .read_at,
+    ).toBeTruthy();
+    expect(
+      (await outsider.get(`/api/t/${outsiderTenant}/notifications`)).body,
+    ).toHaveLength(0);
+  });
+  it("automatically enqueues enabled conversation triggers and makes task effects atomic", async () => {
+    const w = await a.post(`/api/t/${ta}/workflows`).send({
+      name: "Automatic follow-up",
+      trigger: "conversation.created",
+      action: "task.create",
+      enabled: true,
+    });
+    expect(w.status).toBe(201);
+    const r = await a
+      .post(`/api/t/${ta}/conversations`)
+      .send({ name: "Triggered conversation", channel_id: channel });
+    expect(r.status).toBe(201);
+    expect((await a.post(`/api/t/${ta}/jobs/process`)).body.processed).toBe(1);
+    expect(
+      (await a.get(`/api/t/${ta}/tasks?search=Automatic`)).body.total,
+    ).toBe(1);
+  });
+  it("retries disabled workflows then moves to dead letter without effects", async () => {
+    const w = await a.post(`/api/t/${ta}/workflows`).send({
+      name: "Must never execute",
+      trigger: "manual",
+      action: "task.create",
+    });
+    const j = await a.post(`/api/t/${ta}/workflows/${w.body.id}/enqueue`).send({
+      conversation_id: conversation,
+      idempotency_key: "retry-disabled-0001",
+    });
+    expect(j.status).toBe(202);
+    for (let i = 0; i < 3; i++) {
+      expect((await a.post(`/api/t/${ta}/jobs/process`)).status).toBe(200);
+      await db.query(
+        "UPDATE operation_jobs SET available_at=now()-interval '1 second' WHERE id=$1::uuid RETURNING id",
+        [j.body.id],
+      );
+    }
+    const jobs = await a.get(`/api/t/${ta}/jobs`);
+    expect(jobs.body.find((x: any) => x.id === j.body.id).status).toBe("dead");
+    expect(
+      (await a.get(`/api/t/${ta}/tasks?search=Must%20never`)).body.total,
+    ).toBe(0);
+  });
 });

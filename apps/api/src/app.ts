@@ -1,3 +1,4 @@
+import { installOperations } from "./operations.js";
 import express, {
   type Request,
   type Response,
@@ -244,6 +245,7 @@ export function createApp(
       ),
     ),
   );
+  installOperations(app, authorized, asyncRoute, audit);
   for (const table of Object.keys(resources) as Resource[]) {
     const base = `/api/t/:tenant/${table}`;
     const schema = resources[table].strict();
@@ -298,16 +300,23 @@ export function createApp(
       base,
       asyncRoute(async (req, res) =>
         res.status(201).json(
-          await authorized(req, res, "crm.write", async (tx, t) => {
-            const body = schema.parse(req.body);
-            const keys = Object.keys(body);
-            const [row] = await tx.query<{ id: string }>(
-              `INSERT INTO ${table}(tenant_id,${keys.join(",")}) VALUES($1::uuid,${keys.map((k, i) => "$" + (i + 2) + sqlCast(k)).join(",")}) RETURNING *`,
-              [t, ...Object.values(body)],
-            );
-            await audit(tx, t, res.locals.user.id, "create", table, row.id);
-            return row;
-          }),
+          await authorized(
+            req,
+            res,
+            ["channels", "workflows"].includes(table)
+              ? "settings.manage"
+              : "crm.write",
+            async (tx, t) => {
+              const body = schema.parse(req.body);
+              const keys = Object.keys(body);
+              const [row] = await tx.query<{ id: string }>(
+                `INSERT INTO ${table}(tenant_id,${keys.join(",")}) VALUES($1::uuid,${keys.map((k, i) => "$" + (i + 2) + sqlCast(k)).join(",")}) RETURNING *`,
+                [t, ...Object.values(body)],
+              );
+              await audit(tx, t, res.locals.user.id, "create", table, row.id);
+              return row;
+            },
+          ),
         ),
       ),
     );
@@ -315,19 +324,26 @@ export function createApp(
       `${base}/:id`,
       asyncRoute(async (req, res) =>
         res.json(
-          await authorized(req, res, "crm.write", async (tx, t) => {
-            const id = uuid.parse(req.params.id);
-            const body = schema.partial().parse(req.body);
-            const keys = Object.keys(body);
-            if (!keys.length) throw new HttpError(400, "No fields");
-            const [row] = await tx.query(
-              `UPDATE ${table} SET ${keys.map((k, i) => `${k}=$${i + 3}${sqlCast(k)}`).join(",")},updated_at=now() WHERE tenant_id=$1::uuid AND id=$2::uuid RETURNING *`,
-              [t, id, ...Object.values(body)],
-            );
-            if (!row) throw new HttpError(404, "Record not found");
-            await audit(tx, t, res.locals.user.id, "update", table, id);
-            return row;
-          }),
+          await authorized(
+            req,
+            res,
+            ["channels", "workflows"].includes(table)
+              ? "settings.manage"
+              : "crm.write",
+            async (tx, t) => {
+              const id = uuid.parse(req.params.id);
+              const body = schema.partial().parse(req.body);
+              const keys = Object.keys(body);
+              if (!keys.length) throw new HttpError(400, "No fields");
+              const [row] = await tx.query(
+                `UPDATE ${table} SET ${keys.map((k, i) => `${k}=$${i + 3}${sqlCast(k)}`).join(",")},updated_at=now() WHERE tenant_id=$1::uuid AND id=$2::uuid RETURNING *`,
+                [t, id, ...Object.values(body)],
+              );
+              if (!row) throw new HttpError(404, "Record not found");
+              await audit(tx, t, res.locals.user.id, "update", table, id);
+              return row;
+            },
+          ),
         ),
       ),
     );
@@ -619,7 +635,7 @@ async function audit(
 function sqlCast(key: string) {
   return key.endsWith("_id")
     ? "::uuid"
-    : key === "due_at"
+    : ["due_at", "reminder_at"].includes(key)
       ? "::timestamptz"
       : "";
 }

@@ -20,7 +20,9 @@ test("register → organization → customer → edit → pipeline", async ({
   await page.getByLabel("نام", { exact: true }).fill("مشتری آزمایشی");
   await page.getByLabel("ایمیل", { exact: true }).fill("customer@example.test");
   await page.getByRole("button", { name: "ذخیره اطلاعات" }).click();
-  await page.getByRole("button", { name: "مشتریان", exact: true }).click();
+  if (info.project.name.includes("mobile"))
+    await page.getByLabel("Mobile navigation").selectOption("accounts");
+  else await page.getByRole("button", { name: "مشتریان", exact: true }).click();
   await expect(
     page.getByRole("button", { name: "مشتری آزمایشی", exact: true }),
   ).toBeVisible();
@@ -28,7 +30,10 @@ test("register → organization → customer → edit → pipeline", async ({
   await page.getByLabel("تلفن", { exact: true }).fill("09123456789");
   await page.getByRole("button", { name: "ذخیره اطلاعات" }).click();
   await expect(page.getByText("09123456789", { exact: true })).toBeVisible();
-  await page.getByRole("button", { name: "قیف فروش", exact: true }).click();
+  if (info.project.name.includes("mobile"))
+    await page.getByLabel("Mobile navigation").selectOption("pipeline");
+  else
+    await page.getByRole("button", { name: "قیف فروش", exact: true }).click();
   await page.getByRole("button", { name: "افزودن جدید" }).click();
   await page.getByLabel("نام", { exact: true }).fill("فرصت آزمایشی");
   await page

@@ -15,6 +15,18 @@ await pg.exec(
     "utf8",
   ),
 );
+for (const file of [
+  "backend-permissions.sql",
+  "hardening.sql",
+  "writer-audit.sql",
+  "operations.sql",
+])
+  await pg.exec(
+    readFileSync(
+      new URL("../packages/database/" + file, import.meta.url),
+      "utf8",
+    ),
+  );
 const wrap = (client: Pick<PGlite, "query">): Executor => ({
   query: async <T>(sql: string, values: unknown[] = []) =>
     (await client.query<T>(sql, values)).rows,
