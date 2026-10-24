@@ -64,3 +64,12 @@ CREATE FUNCTION private.touch_conversation() RETURNS trigger LANGUAGE plpgsql SE
 END $$;
 REVOKE ALL ON FUNCTION private.touch_conversation() FROM PUBLIC;
 CREATE TRIGGER message_touch AFTER INSERT ON messages FOR EACH ROW EXECUTE FUNCTION private.touch_conversation();
+CREATE FUNCTION private.rearm_task_reminder() RETURNS trigger LANGUAGE plpgsql SET search_path='' AS $$ BEGIN
+ IF NEW.reminder_at IS DISTINCT FROM OLD.reminder_at THEN
+  NEW.reminder_sent_at:=NULL;
+  NEW.owner_id:=coalesce(NEW.owner_id,private.identity());
+ END IF;
+ RETURN NEW;
+END $$;
+REVOKE ALL ON FUNCTION private.rearm_task_reminder() FROM PUBLIC;
+CREATE TRIGGER rearm_task_reminder BEFORE UPDATE ON tasks FOR EACH ROW EXECUTE FUNCTION private.rearm_task_reminder();

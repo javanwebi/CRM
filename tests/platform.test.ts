@@ -589,6 +589,15 @@ describe.sequential("Phase two operations on PostgreSQL", () => {
       notifications.body.filter((n: any) => n.name === "Due reminder"),
     ).toHaveLength(1);
     expect((await b.get(`/api/t/${ta}/notifications`)).body).toHaveLength(0);
+    await a
+      .patch(`/api/t/${ta}/tasks/${r.body.id}`)
+      .send({ reminder_at: "2021-01-01T09:00:00.000Z" });
+    await a.post(`/api/t/${ta}/jobs/process`);
+    expect(
+      (await a.get(`/api/t/${ta}/notifications`)).body.filter(
+        (n: any) => n.name === "Due reminder",
+      ),
+    ).toHaveLength(2);
   });
   it("searches only current tenant and assembles customer 360", async () => {
     const r = await a.get(`/api/t/${ta}/search?q=Renewal`);
@@ -690,6 +699,41 @@ describe.sequential("Phase two operations on PostgreSQL", () => {
     expect(
       (await a.get(`/api/t/${ta}/tasks?search=Automatic`)).body.total,
     ).toBe(1);
+  });
+  it("rolls back task effects when completion audit fails, preserving the retryable job", async () => {
+    const w = await a
+      .post(`/api/t/${ta}/workflows`)
+      .send({
+        name: "Atomic effect test",
+        trigger: "manual",
+        action: "task.create",
+        enabled: true,
+      });
+    const j = await a
+      .post(`/api/t/${ta}/workflows/${w.body.id}/enqueue`)
+      .send({
+        conversation_id: conversation,
+        idempotency_key: "atomic-failure-test",
+      });
+    expect(j.status).toBe(202);
+    await pg.exec(
+      "CREATE FUNCTION private.test_audit_failure() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN IF NEW.resource='operation_jobs' AND NEW.action='complete' THEN RAISE EXCEPTION 'test forced failure'; END IF; RETURN NEW; END $$; CREATE TRIGGER test_audit_failure BEFORE INSERT ON audit_logs FOR EACH ROW EXECUTE FUNCTION private.test_audit_failure()",
+    );
+    try {
+      expect((await a.post(`/api/t/${ta}/jobs/process`)).status).toBe(200);
+      expect(
+        (await a.get(`/api/t/${ta}/tasks?search=Atomic%20effect`)).body.total,
+      ).toBe(0);
+      expect(
+        (await a.get(`/api/t/${ta}/jobs`)).body.find(
+          (x: any) => x.id === j.body.id,
+        ).status,
+      ).toBe("retry");
+    } finally {
+      await pg.exec(
+        "DROP TRIGGER test_audit_failure ON audit_logs; DROP FUNCTION private.test_audit_failure()",
+      );
+    }
   });
   it("retries disabled workflows then moves to dead letter without effects", async () => {
     const w = await a.post(`/api/t/${ta}/workflows`).send({
