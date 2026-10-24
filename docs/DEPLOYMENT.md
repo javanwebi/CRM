@@ -28,3 +28,7 @@ The self-hosted Compose file includes Redis and a BullMQ worker. No managed Redi
 ## Backups and upgrades
 
 Use pg_dump or your provider's backup service before applying future migrations to real customer data, and test restoration. Use a development database first. Never edit an already applied migration or run the standalone installer against an already initialized Supabase database. Supabase migration filenames match the versions returned by its migration ledger.
+
+## Verified release
+
+Executable commit: f936a4b9a3cd7724188de0cb7cfae16295f7ddc9. Railway deployment 3d0f830b-8bb6-465b-8d3e-38050e37c780 reached SUCCESS. GitHub CI run 40043761324 passed all checks, including native PostgreSQL, desktop/mobile browser flows, Docker Compose and Redis worker execution denial. The service watches app/package/build files; documentation-only changes do not require a new application release.
