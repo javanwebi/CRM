@@ -544,6 +544,19 @@ describe.sequential("Phase two operations on PostgreSQL", () => {
     expect(
       (await request(app).post(`/api/inbound/${channel}`).send(payload)).status,
     ).toBe(401);
+    const expired = String(Number(stamp) - 600);
+    const expiredSignature = createHmac("sha256", secret)
+      .update(expired + "." + JSON.stringify(payload))
+      .digest("hex");
+    expect(
+      (
+        await request(app)
+          .post(`/api/inbound/${channel}`)
+          .set("x-crm-timestamp", expired)
+          .set("x-crm-signature", expiredSignature)
+          .send(payload)
+      ).status,
+    ).toBe(401);
     const deliver = () =>
       request(app)
         .post(`/api/inbound/${channel}`)

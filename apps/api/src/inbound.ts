@@ -25,7 +25,7 @@ export function installInbound(app: Express, db: Database) {
   app.post("/api/inbound/:channel", async (req, res, next) => {
     try {
       const configs = configSchema.parse(
-        JSON.parse(process.env.INBOUND_CHANNELS_JSON ?? "{}"),
+        JSON.parse(process.env.INBOUND_CHANNELS_JSON || "{}"),
       );
       const config = configs[req.params.channel];
       if (!config)

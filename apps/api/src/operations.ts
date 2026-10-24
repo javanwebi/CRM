@@ -207,7 +207,7 @@ export function installOperations(
             .strict()
             .parse(req.body);
           const [job] = await tx.query(
-            "INSERT INTO operation_jobs(tenant_id,name,workflow_id,conversation_id,requested_by,idempotency_key) VALUES($1::uuid,$2,$3::uuid,$4::uuid,$5::uuid,$6) ON CONFLICT(tenant_id,idempotency_key) DO UPDATE SET idempotency_key=excluded.idempotency_key RETURNING *",
+            "INSERT INTO operation_jobs(tenant_id,name,workflow_id,conversation_id,requested_by,idempotency_key) VALUES($1::uuid,$2,$3::uuid,$4::uuid,$5::uuid,$6) ON CONFLICT(tenant_id,idempotency_key) DO UPDATE SET idempotency_key=excluded.idempotency_key WHERE operation_jobs.workflow_id=excluded.workflow_id AND operation_jobs.conversation_id=excluded.conversation_id RETURNING *",
             [
               t,
               "Workflow",
@@ -217,6 +217,10 @@ export function installOperations(
               b.idempotency_key,
             ],
           );
+          if (!job) {
+            res.status(409);
+            return { error: "Idempotency key already used for another event" };
+          }
           await audit(
             tx,
             t,

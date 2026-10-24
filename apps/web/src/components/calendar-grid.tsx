@@ -21,17 +21,10 @@ function startOfMonth(anchor: Date, fa: boolean) {
 export function CalendarGrid({ tasks, fa }: { tasks: Task[]; fa: boolean }) {
   const [anchor, setAnchor] = useState(() => new Date());
   const [selected, setSelected] = useState<string | null>(null);
-  const { days, start, next } = useMemo(() => {
-    const start = startOfMonth(anchor, fa),
-      month = calendarParts(start, fa).month,
-      days: Date[] = [];
-    const d = new Date(start);
-    while (calendarParts(d, fa).month === month) {
-      days.push(new Date(d));
-      d.setDate(d.getDate() + 1);
-    }
-    return { days, start, next: new Date(d) };
-  }, [anchor, fa]);
+  const { days, start, next } = useMemo(
+    () => calendarMonth(anchor, fa),
+    [anchor, fa],
+  );
   const key = (d: Date) => `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
   const byDate = new Map<string, Task[]>();
   for (const task of tasks) {
@@ -154,4 +147,16 @@ export function CalendarGrid({ tasks, fa }: { tasks: Task[]; fa: boolean }) {
       )}
     </section>
   );
+}
+
+export function calendarMonth(anchor: Date, fa: boolean) {
+  const start = startOfMonth(anchor, fa),
+    month = calendarParts(start, fa).month,
+    days: Date[] = [];
+  const d = new Date(start);
+  while (calendarParts(d, fa).month === month) {
+    days.push(new Date(d));
+    d.setDate(d.getDate() + 1);
+  }
+  return { days, start, next: new Date(d) };
 }

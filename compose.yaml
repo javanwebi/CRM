@@ -35,6 +35,10 @@ services:
       APP_ORIGIN: ${APP_ORIGIN:-http://localhost:3000}
       PORT: 3000
       NODE_ENV: ${NODE_ENV:-development}
+      SUMMARY_ADAPTER_ENABLED: ${SUMMARY_ADAPTER_ENABLED:-false}
+      SUMMARY_ADAPTER_URL: ${SUMMARY_ADAPTER_URL:-}
+      SUMMARY_ADAPTER_TOKEN: ${SUMMARY_ADAPTER_TOKEN:-}
+      INBOUND_CHANNELS_JSON: ${INBOUND_CHANNELS_JSON:-}
     depends_on:
       migrate: { condition: service_completed_successfully }
     restart: unless-stopped
