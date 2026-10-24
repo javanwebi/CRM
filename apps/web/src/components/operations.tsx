@@ -1,3 +1,5 @@
+import { CalendarGrid } from "./calendar-grid";
+import * as Dialog from "@radix-ui/react-dialog";
 import React, { useEffect, useState } from "react";
 import {
   Inbox,
@@ -45,8 +47,12 @@ export function Operations({
     [loading, setLoading] = useState(true),
     [refresh, setRefresh] = useState(0),
     [summary, setSummary] = useState(""),
+    [summaryMode, setSummaryMode] = useState("extractive"),
+    [suggestions, setSuggestions] = useState<string[]>([]),
+    [savedSuggestions, setSavedSuggestions] = useState<string[]>([]),
     [filter, setFilter] = useState("all"),
     [form, setForm] = useState(false),
+    [channelForm, setChannelForm] = useState(false),
     [customer, setCustomer] = useState<any>(null);
   useEffect(() => {
     let live = true;
@@ -77,6 +83,9 @@ export function Operations({
     let live = true;
     setMessages([]);
     setSummary("");
+    setSuggestions([]);
+    setSavedSuggestions([]);
+    setSummaryMode("extractive");
     if (selected && page === "inbox")
       api(`${base}/conversations/${selected.id}/thread`)
         .then((r) => live && setMessages(r.messages))
@@ -102,7 +111,7 @@ export function Operations({
     const b = Object.fromEntries(new FormData(e.currentTarget));
     await execute(async () => {
       if (page === "inbox") {
-        if (!channels.length) {
+        if (channelForm || !channels.length) {
           await api(`${base}/channels`, "POST", { name: b.name, kind: b.kind });
         } else
           await api(`${base}/conversations`, "POST", {
@@ -166,11 +175,27 @@ export function Operations({
           ))}
         </div>
         {["inbox", "workflows", "calendar"].includes(page) && (
-          <Button onClick={() => setForm(true)}>
+          <Button
+            onClick={() => {
+              setChannelForm(!channels.length);
+              setForm(true);
+            }}
+          >
             <Plus size={16} />
             {page === "inbox" && !channels.length
               ? tr("ایجاد کانال", "Create channel")
               : tr("ایجاد جدید", "Create new")}
+          </Button>
+        )}
+        {page === "inbox" && channels.length > 0 && (
+          <Button
+            variant="outline"
+            onClick={() => {
+              setChannelForm(true);
+              setForm(true);
+            }}
+          >
+            {tr("کانال جدید", "New channel")}
           </Button>
         )}
       </div>
@@ -298,9 +323,14 @@ export function Operations({
                           className={"message-bubble " + m.direction}
                         >
                           <span>
-                            {m.direction === "draft"
-                              ? tr("پیش‌نویس — ارسال نشده", "Draft — not sent")
-                              : tr("یادداشت داخلی", "Internal note")}
+                            {m.direction === "inbound"
+                              ? tr("پیام دریافتی", "Received message")
+                              : m.direction === "draft"
+                                ? tr(
+                                    "پیش‌نویس — ارسال نشده",
+                                    "Draft — not sent",
+                                  )
+                                : tr("یادداشت داخلی", "Internal note")}
                           </span>
                           <p>{m.body}</p>
                           <time>
@@ -408,6 +438,8 @@ export function Operations({
                             `${base}/conversations/${selected.id}/summary`,
                             "POST",
                           );
+                          setSummaryMode(r.mode);
+                          setSuggestions(r.suggestions ?? []);
                           setSummary(
                             (r.mode === "model"
                               ? tr(
@@ -426,12 +458,59 @@ export function Operations({
                       {tr("مرور متن مکالمه", "Review conversation text")}
                     </Button>
                     <small>
-                      {tr(
-                        "خلاصه استخراجی محلی؛ مدل زبانی متصل نیست.",
-                        "Local extractive preview. No language model connected.",
-                      )}
+                      {summaryMode === "model"
+                        ? tr(
+                            "پیشنهاد مدل؛ پیش از اقدام بررسی کنید.",
+                            "Model output; review before acting.",
+                          )
+                        : tr(
+                            "خلاصه استخراجی محلی؛ مدل زبانی متصل نیست.",
+                            "Local extractive preview. No language model connected.",
+                          )}
                     </small>
                     <p className="summary-preview">{summary}</p>
+                    {suggestions.map((suggestion, i) => (
+                      <div className="suggested-action" key={i}>
+                        <p>
+                          {summaryMode === "extractive"
+                            ? tr(
+                                "مرور مکالمه و ایجاد وظیفه پیگیری",
+                                "Review conversation and create a follow-up task",
+                              )
+                            : suggestion}
+                        </p>
+                        <Button
+                          variant="outline"
+                          disabled={savedSuggestions.includes(suggestion)}
+                          onClick={() =>
+                            void execute(async () => {
+                              await api(`${base}/tasks`, "POST", {
+                                name:
+                                  summaryMode === "extractive"
+                                    ? tr(
+                                        "پیگیری مکالمه",
+                                        "Conversation follow-up",
+                                      )
+                                    : suggestion.slice(0, 200),
+                                description: selected.name,
+                                account_id: selected.account_id,
+                              });
+                              setSavedSuggestions((list) => [
+                                ...list,
+                                suggestion,
+                              ]);
+                            })
+                          }
+                        >
+                          {savedSuggestions.includes(suggestion)
+                            ? tr("وظیفه ثبت شد", "Task created")
+                            : tr(
+                                "ایجاد وظیفه با تأیید من",
+                                "Create task with my approval",
+                              )}
+                        </Button>
+                      </div>
+                    ))}
                     <div className="context-divider" />
                     <label>{tr("مشتری مرتبط", "Linked customer")}</label>
                     <p>
@@ -446,6 +525,19 @@ export function Operations({
                 )}
               </aside>
             </div>
+          )}
+          {page === "calendar" && (
+            <CalendarGrid
+              tasks={
+                rows as {
+                  id: string;
+                  name: string;
+                  due_at: string;
+                  status: string;
+                }[]
+              }
+              fa={fa}
+            />
           )}
           {page === "calendar" && (
             <div className="agenda-grid">
@@ -723,101 +815,108 @@ export function Operations({
           )}
         </>
       )}
+      {page === "workflows" && (
+        <WorkflowQueue base={base} workflows={rows} fa={fa} />
+      )}
       {form && (
-        <div className="ops-modal-overlay" onClick={() => setForm(false)}>
-          <section
-            role="dialog"
-            aria-modal="true"
-            aria-label={tr("ایجاد جدید", "Create new")}
-            className="ops-modal"
-            onClick={(e) => e.stopPropagation()}
+        <AccessibleModal
+          label={tr("ایجاد جدید", "Create new")}
+          onClose={() => setForm(false)}
+        >
+          <button
+            className="modal-close"
+            aria-label="Close"
+            onClick={() => setForm(false)}
           >
-            <button
-              className="modal-close"
-              aria-label="Close"
-              onClick={() => setForm(false)}
-            >
-              <X />
-            </button>
-            <h2>{tr("یک قدم تازه", "Create something new")}</h2>
-            <form onSubmit={save}>
-              <label>
-                {tr("عنوان", "Title")}
-                <input name="name" required maxLength={200} autoFocus />
-              </label>
-              {page === "inbox" &&
-                (channels.length ? (
-                  <>
-                    <label>
-                      {tr("کانال", "Channel")}
-                      <select name="channel_id">
-                        {channels.map((c) => (
-                          <option key={c.id} value={c.id}>
-                            {c.name}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                    <RelationshipFields base={base} fa={fa} />
-                  </>
-                ) : (
+            <X />
+          </button>
+          <h2>{tr("یک قدم تازه", "Create something new")}</h2>
+          <form onSubmit={save}>
+            <label>
+              {tr("عنوان", "Title")}
+              <input name="name" required maxLength={200} autoFocus />
+            </label>
+            {page === "inbox" &&
+              (channels.length && !channelForm ? (
+                <>
                   <label>
-                    {tr("نوع کانال", "Channel type")}
-                    <select name="kind">
-                      {["email", "sms", "whatsapp", "internal"].map((c) => (
-                        <option key={c}>{c}</option>
+                    {tr("کانال", "Channel")}
+                    <select
+                      aria-label={tr("کانال", "Channel")}
+                      name="channel_id"
+                    >
+                      {channels.map((c) => (
+                        <option key={c.id} value={c.id}>
+                          {c.name}
+                        </option>
                       ))}
                     </select>
                   </label>
-                ))}
-              {page === "calendar" && (
-                <>
-                  <label>
-                    {tr("موعد", "Due date")}
-                    <input required type="datetime-local" name="due_at" />
-                  </label>
-                  <label>
-                    {tr("یادآوری", "Reminder")}
-                    <input type="datetime-local" name="reminder_at" />
-                  </label>
+                  <RelationshipFields base={base} fa={fa} />
                 </>
-              )}
-              {page === "workflows" && (
-                <>
-                  <label>
-                    {tr("محرک", "Trigger")}
-                    <select name="trigger">
-                      <option value="manual">{tr("دستی", "Manual")}</option>
-                      <option value="conversation.created">
-                        {tr("مکالمه جدید", "Conversation created")}
-                      </option>
-                    </select>
-                  </label>
-                  <label>
-                    {tr("شرط وضعیت", "Status condition")}
-                    <select name="condition_status">
-                      {["open", "pending", "closed"].map((s) => (
-                        <option key={s}>{s}</option>
-                      ))}
-                    </select>
-                  </label>
-                  <label>
-                    {tr("اقدام", "Action")}
-                    <select name="action">
-                      <option value="task.create">
-                        {tr("ایجاد وظیفه", "Create task")}
-                      </option>
-                      <option value="notification.create">
-                        {tr("ایجاد اعلان", "Create notification")}
-                      </option>
-                    </select>
-                  </label>
-                </>
-              )}
-              <Button type="submit">{tr("ذخیره", "Save")}</Button>
-            </form>
-          </section>
-        </div>
+              ) : (
+                <label>
+                  {tr("نوع کانال", "Channel type")}
+                  <select
+                    aria-label={tr("نوع کانال", "Channel type")}
+                    name="kind"
+                  >
+                    {["email", "sms", "whatsapp", "internal"].map((c) => (
+                      <option key={c}>{c}</option>
+                    ))}
+                  </select>
+                </label>
+              ))}
+            {page === "calendar" && (
+              <>
+                <label>
+                  {tr("موعد", "Due date")}
+                  <input required type="datetime-local" name="due_at" />
+                </label>
+                <label>
+                  {tr("یادآوری", "Reminder")}
+                  <input type="datetime-local" name="reminder_at" />
+                </label>
+              </>
+            )}
+            {page === "workflows" && (
+              <>
+                <label>
+                  {tr("محرک", "Trigger")}
+                  <select aria-label={tr("محرک", "Trigger")} name="trigger">
+                    <option value="manual">{tr("دستی", "Manual")}</option>
+                    <option value="conversation.created">
+                      {tr("مکالمه جدید", "Conversation created")}
+                    </option>
+                  </select>
+                </label>
+                <label>
+                  {tr("شرط وضعیت", "Status condition")}
+                  <select
+                    aria-label={tr("شرط وضعیت", "Status condition")}
+                    name="condition_status"
+                  >
+                    {["open", "pending", "closed"].map((s) => (
+                      <option key={s}>{s}</option>
+                    ))}
+                  </select>
+                </label>
+                <label>
+                  {tr("اقدام", "Action")}
+                  <select aria-label={tr("اقدام", "Action")} name="action">
+                    <option value="task.create">
+                      {tr("ایجاد وظیفه", "Create task")}
+                    </option>
+                    <option value="notification.create">
+                      {tr("ایجاد اعلان", "Create notification")}
+                    </option>
+                  </select>
+                </label>
+              </>
+            )}
+            <Button type="submit">{tr("ذخیره", "Save")}</Button>
+          </form>
+        </AccessibleModal>
       )}
     </div>
   );
@@ -868,7 +967,7 @@ function RelationshipFields({ base, fa }: { base: string; fa: boolean }) {
       ].map(([table, key, label]) => (
         <label key={key}>
           {label}
-          <select name={key}>
+          <select aria-label={label} name={key}>
             <option value="">—</option>
             {(refs[table] ?? []).map((r) => (
               <option key={r.id} value={r.id}>
@@ -928,82 +1027,276 @@ export function CommandPalette({
         <kbd>⌘ K</kbd>
       </button>
       {open && (
-        <div className="ops-modal-overlay" onClick={() => setOpen(false)}>
-          <section
-            className="command-panel"
-            role="dialog"
-            aria-modal="true"
-            aria-label="Command palette"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="command-input">
-              <Search size={20} />
-              <input
-                autoFocus
-                value={q}
-                onChange={(e) => setQ(e.target.value)}
-                aria-label="Global search"
-                placeholder={
-                  fa
-                    ? "جست‌وجوی مشتری، وظیفه، مکالمه…"
-                    : "Search customers, tasks, conversations…"
-                }
-              />
-              <button onClick={() => setOpen(false)} aria-label="Close">
-                <X size={18} />
+        <AccessibleModal
+          label="Command palette"
+          className="command-panel"
+          onClose={() => setOpen(false)}
+        >
+          <div className="command-input">
+            <Search size={20} />
+            <input
+              autoFocus
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              aria-label="Global search"
+              placeholder={
+                fa
+                  ? "جست‌وجوی مشتری، وظیفه، مکالمه…"
+                  : "Search customers, tasks, conversations…"
+              }
+            />
+            <button onClick={() => setOpen(false)} aria-label="Close">
+              <X size={18} />
+            </button>
+          </div>
+          {error && <p role="alert">{error}</p>}
+          <div className="command-results">
+            {rows.map((r) => (
+              <button
+                key={r.type + r.id}
+                onClick={() => {
+                  navigate(
+                    r.type === "deals"
+                      ? "pipeline"
+                      : r.type === "conversations"
+                        ? "inbox"
+                        : r.type,
+                  );
+                  setOpen(false);
+                }}
+              >
+                <Command size={16} />
+                <strong>{r.name}</strong>
+                <small>{r.type}</small>
               </button>
-            </div>
-            {error && <p role="alert">{error}</p>}
-            <div className="command-results">
-              {rows.map((r) => (
+            ))}
+            {q.length >= 2 && !rows.length && (
+              <p>{fa ? "نتیجه‌ای یافت نشد" : "No results found"}</p>
+            )}
+            {q.length < 2 &&
+              [
+                ["inbox", fa ? "صندوق ورودی" : "Inbox"],
+                ["calendar", fa ? "تقویم" : "Calendar"],
+                ["workflows", fa ? "جریان‌های کاری" : "Workflows"],
+                ["customer360", fa ? "نمای ۳۶۰ مشتری" : "Customer 360"],
+              ].map(([k, label]) => (
                 <button
-                  key={r.type + r.id}
+                  key={k}
                   onClick={() => {
-                    navigate(
-                      r.type === "deals"
-                        ? "pipeline"
-                        : r.type === "conversations"
-                          ? "inbox"
-                          : r.type,
-                    );
+                    navigate(k);
                     setOpen(false);
                   }}
                 >
-                  <Command size={16} />
-                  <strong>{r.name}</strong>
-                  <small>{r.type}</small>
+                  <ArrowUpRight size={16} />
+                  {label}
                 </button>
               ))}
-              {q.length >= 2 && !rows.length && (
-                <p>{fa ? "نتیجه‌ای یافت نشد" : "No results found"}</p>
-              )}
-              {q.length < 2 &&
-                [
-                  ["inbox", fa ? "صندوق ورودی" : "Inbox"],
-                  ["calendar", fa ? "تقویم" : "Calendar"],
-                  ["workflows", fa ? "جریان‌های کاری" : "Workflows"],
-                  ["customer360", fa ? "نمای ۳۶۰ مشتری" : "Customer 360"],
-                ].map(([k, label]) => (
-                  <button
-                    key={k}
-                    onClick={() => {
-                      navigate(k);
-                      setOpen(false);
-                    }}
-                  >
-                    <ArrowUpRight size={16} />
-                    {label}
-                  </button>
-                ))}
-            </div>
-            <footer>
-              {fa
-                ? "جست‌وجوی امن در اطلاعات همین شرکت"
-                : "Search scoped to your current organization"}
-            </footer>
-          </section>
-        </div>
+          </div>
+          <footer>
+            {fa
+              ? "جست‌وجوی امن در اطلاعات همین شرکت"
+              : "Search scoped to your current organization"}
+          </footer>
+        </AccessibleModal>
       )}
     </>
+  );
+}
+
+function AccessibleModal({
+  label,
+  onClose,
+  children,
+  className = "ops-modal",
+}: {
+  label: string;
+  onClose: () => void;
+  children: React.ReactNode;
+  className?: string;
+}) {
+  return (
+    <Dialog.Root
+      open
+      onOpenChange={(value) => {
+        if (!value) onClose();
+      }}
+    >
+      <Dialog.Portal>
+        <Dialog.Overlay className="ops-dialog-backdrop" />
+        <Dialog.Content
+          className={className + " accessible-modal"}
+          aria-describedby={undefined}
+        >
+          <Dialog.Title className="sr-only">{label}</Dialog.Title>
+          {children}
+        </Dialog.Content>
+      </Dialog.Portal>
+    </Dialog.Root>
+  );
+}
+
+function WorkflowQueue({
+  base,
+  workflows,
+  fa,
+}: {
+  base: string;
+  workflows: Row[];
+  fa: boolean;
+}) {
+  const [open, setOpen] = useState(false),
+    [jobs, setJobs] = useState<Row[]>([]),
+    [conversations, setConversations] = useState<Row[]>([]),
+    [error, setError] = useState(""),
+    [refresh, setRefresh] = useState(0);
+  const tr = (a: string, b: string) => (fa ? a : b);
+  useEffect(() => {
+    let live = true;
+    if (!open) return;
+    Promise.all([api(`${base}/jobs`), api(`${base}/conversations?limit=100`)])
+      .then(([j, c]) => {
+        if (live) {
+          setJobs(j);
+          setConversations(c.data);
+        }
+      })
+      .catch((e) => live && setError(e.message));
+    return () => {
+      live = false;
+    };
+  }, [open, base, refresh]);
+  async function perform(fn: () => Promise<unknown>) {
+    setError("");
+    try {
+      await fn();
+      setRefresh((x) => x + 1);
+    } catch (e) {
+      setError((e as Error).message);
+    }
+  }
+  return (
+    <section className="queue-panel">
+      <button onClick={() => setOpen((x) => !x)}>
+        <Workflow size={18} />
+        <strong>
+          {tr("صف اجرا و خطاها", "Execution queue & dead letters")}
+        </strong>
+        <ChevronRight size={17} />
+      </button>
+      {open && (
+        <>
+          <p>
+            {tr(
+              "کارهای متعلق به شما؛ پردازش پس‌زمینه در نصب دارای Worker فعال است.",
+              "Your jobs. Background processing runs when the worker is installed.",
+            )}
+          </p>
+          {error && (
+            <p role="alert" className="error">
+              {error}
+            </p>
+          )}
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              const b = Object.fromEntries(new FormData(e.currentTarget));
+              void perform(() =>
+                api(`${base}/workflows/${b.workflow_id}/enqueue`, "POST", {
+                  conversation_id: b.conversation_id,
+                  idempotency_key: crypto.randomUUID(),
+                }),
+              );
+            }}
+          >
+            <label>
+              {tr("جریان کاری", "Workflow")}
+              <select
+                required
+                aria-label={tr("جریان کاری", "Workflow")}
+                name="workflow_id"
+              >
+                {workflows.map((w) => (
+                  <option key={w.id} value={w.id}>
+                    {w.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              {tr("مکالمه", "Conversation")}
+              <select
+                required
+                aria-label={tr("مکالمه", "Conversation")}
+                name="conversation_id"
+              >
+                {conversations.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <Button
+              type="submit"
+              disabled={!workflows.length || !conversations.length}
+            >
+              {tr("افزودن به صف", "Enqueue")}
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() =>
+                void perform(() => api(`${base}/jobs/process`, "POST"))
+              }
+            >
+              {tr("پردازش اکنون", "Process now")}
+            </Button>
+          </form>
+          <div className="queue-list">
+            {jobs.map((j) => (
+              <article key={j.id}>
+                <div>
+                  <strong>{j.name}</strong>
+                  <small>
+                    {new Date(j.created_at).toLocaleString(
+                      fa ? "fa-IR" : "en-US",
+                    )}
+                  </small>
+                </div>
+                <span
+                  className={
+                    "status-pill " +
+                    (j.status === "completed" ? "open" : "pending")
+                  }
+                >
+                  {
+                    (
+                      {
+                        pending: tr("در صف", "Pending"),
+                        retry: tr("تلاش مجدد", "Retry"),
+                        dead: tr("خطای نهایی", "Dead letter"),
+                        completed: tr("پایان یافته", "Completed"),
+                      } as Record<string, string>
+                    )[j.status]
+                  }{" "}
+                  · {j.attempts}/3
+                </span>
+                {j.status === "dead" && (
+                  <button
+                    onClick={() =>
+                      void perform(() =>
+                        api(`${base}/jobs/${j.id}/retry`, "POST"),
+                      )
+                    }
+                  >
+                    {tr("بازگرداندن به صف", "Replay")}
+                  </button>
+                )}
+              </article>
+            ))}
+          </div>
+        </>
+      )}
+    </section>
   );
 }

@@ -424,18 +424,26 @@ function App() {
             </span>
           </div>
           <div className="header-actions">
-            <div className="search">
-              <Search size={17} />
-              <input
-                aria-label="Search"
-                placeholder={tr("جست‌وجو در این بخش…", "Search this section…")}
-                value={search}
-                onChange={(e) => {
-                  setSearch(e.target.value);
-                  setOffset(1);
-                }}
-              />
-            </div>
+            {tenant && (
+              <CommandPalette tenant={tenant} fa={fa} navigate={setPage} />
+            )}
+            {!operationPages.includes(page) && (
+              <div className="search">
+                <Search size={17} />
+                <input
+                  aria-label="Search"
+                  placeholder={tr(
+                    "جست‌وجو در این بخش…",
+                    "Search this section…",
+                  )}
+                  value={search}
+                  onChange={(e) => {
+                    setSearch(e.target.value);
+                    setOffset(1);
+                  }}
+                />
+              </div>
+            )}
             <button
               className="icon-button"
               aria-label="Change language"
@@ -447,9 +455,6 @@ function App() {
           </div>
         </header>
         <main>
-          {tenant && (
-            <CommandPalette tenant={tenant} fa={fa} navigate={setPage} />
-          )}
           <div className="page-heading">
             <div>
               <div className="eyebrow">

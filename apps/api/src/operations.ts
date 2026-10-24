@@ -230,6 +230,30 @@ export function installOperations(
       ),
     ),
   );
+  app.post(
+    base + "/jobs/:id/retry",
+    route(async (req, res) =>
+      res.json(
+        await authorized(req, res, "settings.manage", async (tx, t) => {
+          const id = uuid.parse(req.params.id);
+          const rows = await tx.query(
+            "UPDATE operation_jobs SET status='pending',attempts=0,available_at=now(),last_error=null,updated_at=now() WHERE tenant_id=$1::uuid AND id=$2::uuid AND requested_by=$3::uuid AND status='dead' RETURNING id",
+            [t, id, res.locals.user.id],
+          );
+          if (rows.length)
+            await audit(
+              tx,
+              t,
+              res.locals.user.id,
+              "retry",
+              "operation_jobs",
+              id,
+            );
+          return { data: rows };
+        }),
+      ),
+    ),
+  );
   // Transactional drain: row locks serialize competing consumers; effects + completed status commit together.
   app.post(
     base + "/jobs/process",

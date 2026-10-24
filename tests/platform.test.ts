@@ -701,5 +701,13 @@ describe.sequential("Phase two operations on PostgreSQL", () => {
     expect(
       (await a.get(`/api/t/${ta}/tasks?search=Must%20never`)).body.total,
     ).toBe(0);
+    expect(
+      (await a.post(`/api/t/${ta}/jobs/${j.body.id}/retry`)).body.data,
+    ).toHaveLength(1);
+    expect(
+      (await a.get(`/api/t/${ta}/jobs`)).body.find(
+        (x: any) => x.id === j.body.id,
+      ).attempts,
+    ).toBe(0);
   });
 });
