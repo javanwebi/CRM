@@ -1,3 +1,15 @@
+import {
+  Operations,
+  CommandPalette,
+  operationPages,
+} from "./components/operations";
+import {
+  Inbox,
+  CalendarDays,
+  Workflow,
+  Bell,
+  ContactRound,
+} from "lucide-react";
 import React, { useEffect, useState, useCallback } from "react";
 import { createRoot } from "react-dom/client";
 import {
@@ -30,6 +42,11 @@ import { Auth, Empty } from "./components/account";
 type Row = { id: string; [key: string]: any };
 const menus = [
   ["dashboard", "نمای کلی", "Overview", LayoutDashboard],
+  ["inbox", "صندوق ورودی", "Inbox", Inbox],
+  ["customer360", "پرونده مشتری", "Customer 360", ContactRound],
+  ["calendar", "تقویم", "Calendar", CalendarDays],
+  ["workflows", "جریان‌های کاری", "Workflows", Workflow],
+  ["notifications", "اعلان‌ها", "Notifications", Bell],
   ["accounts", "مشتریان", "Customers", Building2],
   ["contacts", "مخاطبان", "Contacts", Users],
   ["leads", "سرنخ‌ها", "Leads", Target],
@@ -154,7 +171,7 @@ function App() {
     setData(null);
   }, [tenant, page]);
   useEffect(() => {
-    if (!user || !tenant) return;
+    if (!user || !tenant || operationPages.includes(page)) return;
     let live = true;
     setBusy(true);
     setError("");
@@ -406,6 +423,9 @@ function App() {
           </div>
         </header>
         <main>
+          {tenant && (
+            <CommandPalette tenant={tenant} fa={fa} navigate={setPage} />
+          )}
           <div className="page-heading">
             <div>
               <div className="eyebrow">
@@ -465,7 +485,9 @@ function App() {
               </button>
             </div>
           )}
-          {!tenant ? (
+          {tenant && operationPages.includes(page) ? (
+            <Operations tenant={tenant} page={page} fa={fa} />
+          ) : !tenant ? (
             <div className="setup-card">
               <div className="setup-icon">
                 <Building2 size={38} />
