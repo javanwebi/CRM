@@ -1,6 +1,10 @@
+import { startOperationsWorker } from "./operations.js";
 import { Worker, UnrecoverableError } from "bullmq";
 import { z } from "zod";
 const env = z.object({ REDIS_URL: z.string().url() }).parse(process.env);
+const closeOperations = process.env.DATABASE_URL
+  ? startOperationsWorker(env.REDIS_URL)
+  : async () => {};
 const worker = new Worker(
   "crm-ai",
   async (job) => {
@@ -23,5 +27,7 @@ worker.on("failed", (job, error) =>
   console.error("job_failed", job?.id, error.message),
 );
 process.on("SIGTERM", () => {
-  void worker.close().then(() => process.exit(0));
+  void Promise.all([worker.close(), closeOperations()]).then(() =>
+    process.exit(0),
+  );
 });

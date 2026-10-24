@@ -35,6 +35,10 @@ services:
       APP_ORIGIN: ${APP_ORIGIN:-http://localhost:3000}
       PORT: 3000
       NODE_ENV: ${NODE_ENV:-development}
+      SUMMARY_ADAPTER_ENABLED: ${SUMMARY_ADAPTER_ENABLED:-false}
+      SUMMARY_ADAPTER_URL: ${SUMMARY_ADAPTER_URL:-}
+      SUMMARY_ADAPTER_TOKEN: ${SUMMARY_ADAPTER_TOKEN:-}
+      INBOUND_CHANNELS_JSON: ${INBOUND_CHANNELS_JSON:-}
     depends_on:
       migrate: { condition: service_completed_successfully }
     restart: unless-stopped
@@ -53,7 +57,9 @@ services:
     command: [node, --import, tsx, apps/worker/src/index.ts]
     environment:
       REDIS_URL: redis://redis:6379
+      DATABASE_URL: postgresql://crm:${POSTGRES_PASSWORD}@postgres:5432/crm
     depends_on:
+      migrate: { condition: service_completed_successfully }
       redis: { condition: service_healthy }
     restart: unless-stopped
 volumes:

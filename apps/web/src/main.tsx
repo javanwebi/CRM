@@ -1,3 +1,15 @@
+import {
+  Operations,
+  CommandPalette,
+  operationPages,
+} from "./components/operations";
+import {
+  Inbox,
+  CalendarDays,
+  Workflow,
+  Bell,
+  ContactRound,
+} from "lucide-react";
 import React, { useEffect, useState, useCallback } from "react";
 import { createRoot } from "react-dom/client";
 import {
@@ -30,12 +42,18 @@ import { Auth, Empty } from "./components/account";
 type Row = { id: string; [key: string]: any };
 const menus = [
   ["dashboard", "نمای کلی", "Overview", LayoutDashboard],
+  ["inbox", "صندوق ورودی", "Inbox", Inbox],
+  ["customer360", "پرونده مشتری", "Customer 360", ContactRound],
+  ["calendar", "تقویم", "Calendar", CalendarDays],
+  ["workflows", "جریان‌های کاری", "Workflows", Workflow],
+  ["notifications", "اعلان‌ها", "Notifications", Bell],
   ["accounts", "مشتریان", "Customers", Building2],
   ["contacts", "مخاطبان", "Contacts", Users],
   ["leads", "سرنخ‌ها", "Leads", Target],
   ["pipeline", "قیف فروش", "Sales pipeline", KanbanSquare],
   ["tasks", "وظایف", "Tasks", CheckSquare],
   ["activities", "فعالیت‌ها", "Activities", Phone],
+  ["call_logs", "ثبت تماس", "Call logs", Phone],
   ["notes", "یادداشت‌ها", "Notes", FileText],
   ["team", "اعضای تیم", "Team", Shield],
   ["settings", "تنظیمات", "Settings", Settings],
@@ -55,6 +73,9 @@ const faFields: Record<string, string> = {
   value: "مبلغ",
   currency: "واحد پول",
   due_at: "موعد انجام",
+  reminder_at: "زمان یادآوری",
+  outcome: "نتیجه تماس",
+  duration_seconds: "مدت تماس (ثانیه)",
   body: "متن یادداشت",
   role_id: "نقش",
   code: "کد دعوت",
@@ -72,11 +93,26 @@ const fields: Record<string, string[]> = {
     "currency",
     "status",
   ],
-  tasks: ["name", "status", "due_at", "description"],
+  tasks: [
+    "name",
+    "status",
+    "due_at",
+    "reminder_at",
+    "account_id",
+    "description",
+  ],
+  call_logs: [
+    "name",
+    "account_id",
+    "outcome",
+    "duration_seconds",
+    "description",
+  ],
   activities: ["name", "kind", "account_id", "description"],
   notes: ["name", "body", "account_id"],
 };
 const enums: Record<string, Record<string, string[]>> = {
+  call_logs: { outcome: ["answered", "no_answer", "busy", "follow_up"] },
   accounts: { kind: ["company", "person"] },
   leads: { status: ["new", "qualified", "lost", "converted"] },
   deals: { status: ["open", "won", "lost"], currency: ["IRR", "USD", "EUR"] },
@@ -84,6 +120,10 @@ const enums: Record<string, Record<string, string[]>> = {
   activities: { kind: ["call", "meeting", "email"] },
 };
 const enumFa: Record<string, string> = {
+  answered: "پاسخ داده شد",
+  no_answer: "بدون پاسخ",
+  busy: "اشغال",
+  follow_up: "نیازمند پیگیری",
   company: "حقوقی",
   person: "حقیقی",
   new: "جدید",
@@ -154,7 +194,7 @@ function App() {
     setData(null);
   }, [tenant, page]);
   useEffect(() => {
-    if (!user || !tenant) return;
+    if (!user || !tenant || operationPages.includes(page)) return;
     let live = true;
     setBusy(true);
     setError("");
@@ -227,8 +267,9 @@ function App() {
         const body: Record<string, any> = { ...b };
         for (const k of Object.keys(body)) {
           if (k.endsWith("_id") && body[k] === "") body[k] = null;
-          if (k === "value") body[k] = Number(body[k]);
-          if (k === "due_at")
+          if (["value", "duration_seconds"].includes(k))
+            body[k] = Number(body[k]);
+          if (["due_at", "reminder_at"].includes(k))
             body[k] = body[k] ? new Date(body[k]).toISOString() : null;
         }
         await api(
@@ -383,18 +424,26 @@ function App() {
             </span>
           </div>
           <div className="header-actions">
-            <div className="search">
-              <Search size={17} />
-              <input
-                aria-label="Search"
-                placeholder={tr("جست‌وجو در این بخش…", "Search this section…")}
-                value={search}
-                onChange={(e) => {
-                  setSearch(e.target.value);
-                  setOffset(1);
-                }}
-              />
-            </div>
+            {tenant && (
+              <CommandPalette tenant={tenant} fa={fa} navigate={setPage} />
+            )}
+            {!operationPages.includes(page) && (
+              <div className="search">
+                <Search size={17} />
+                <input
+                  aria-label="Search"
+                  placeholder={tr(
+                    "جست‌وجو در این بخش…",
+                    "Search this section…",
+                  )}
+                  value={search}
+                  onChange={(e) => {
+                    setSearch(e.target.value);
+                    setOffset(1);
+                  }}
+                />
+              </div>
+            )}
             <button
               className="icon-button"
               aria-label="Change language"
@@ -465,7 +514,9 @@ function App() {
               </button>
             </div>
           )}
-          {!tenant ? (
+          {tenant && operationPages.includes(page) ? (
+            <Operations tenant={tenant} page={page} fa={fa} />
+          ) : !tenant ? (
             <div className="setup-card">
               <div className="setup-icon">
                 <Building2 size={38} />
@@ -1158,9 +1209,9 @@ function App() {
                         type={
                           k === "email"
                             ? "email"
-                            : k === "value"
+                            : ["value", "duration_seconds"].includes(k)
                               ? "number"
-                              : k === "due_at"
+                              : ["due_at", "reminder_at"].includes(k)
                                 ? "datetime-local"
                                 : "text"
                         }
