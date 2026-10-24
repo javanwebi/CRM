@@ -53,11 +53,12 @@ jobs:
         run: |
           docker compose up --build -d
           for i in $(seq 1 60); do
-            if curl --fail http://localhost:3000/api/health; then exit 0; fi
+            if curl --fail http://localhost:3000/api/health; then ready=yes; break; fi
             sleep 3
           done
-          docker compose logs --no-color
-          exit 1
+          if [ "${ready:-no}" != yes ]; then docker compose logs --no-color; exit 1; fi
+          docker compose exec -T redis redis-cli ping
+          docker compose exec -T -e QUEUE_SMOKE_ALLOWED=test worker node --import tsx apps/worker/src/smoke.ts
       - if: always() && hashFiles('compose.yaml') != ''
         run: docker compose down
         env:

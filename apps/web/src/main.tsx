@@ -687,7 +687,10 @@ function App() {
                                         setDetail(row);
                                       }}
                                     >
-                                      <span className="avatar mini">
+                                      <span
+                                        className="avatar mini"
+                                        aria-hidden="true"
+                                      >
                                         {row.name.slice(0, 1)}
                                       </span>
                                       {row[k]}
